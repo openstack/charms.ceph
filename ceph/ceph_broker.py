@@ -26,6 +26,7 @@ from charmhelpers.contrib.storage.linux.ceph  import (
     create_erasure_profile,
     delete_pool,
     erasure_profile_exists,
+    get_osds,
     pool_exists,
     pool_set,
     remove_pool_snapshot,
@@ -190,7 +191,14 @@ def handle_replicated_pool(request, service):
     replicas = request.get('replicas')
     quota = request.get('max-bytes')
     weight = request.get('weight')
+   
+    # Optional params
     pg_num = request.get('pg_num')
+    if pg_num:
+        # Cap pg_num to max allowed just in case.
+        osds = get_osds(service)
+        if osds:
+            pg_num = min(pg_num, (len(osds) * 100 // replicas))
 
     # Check for missing params
     if pool_name is None or replicas is None:
