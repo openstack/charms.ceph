@@ -13,6 +13,7 @@
 # limitations under the License.
 import ctypes
 import json
+import socket
 import subprocess
 import time
 import os
@@ -44,10 +45,6 @@ from charmhelpers.contrib.storage.linux.utils import (
     is_block_device,
     zap_disk,
     is_device_mounted)
-from utils import (
-    get_unit_hostname,
-)
-
 
 LEADER = 'leader'
 PEON = 'peon'
@@ -95,6 +92,11 @@ NETWORK_ADAPTER_SYSCTLS = {
         'net.ipv4.tcp_adv_win_scale': 1
     }
 }
+
+
+@cached
+def get_unit_hostname():
+    return socket.gethostname()
 
 
 def save_sysctls(sysctl_dict, save_location):
@@ -955,7 +957,15 @@ def get_upgrade_key():
     return get_named_key('upgrade-osd', _upgrade_caps)
 
 
-def get_named_key(name, caps=None):
+def get_named_key(name, caps=None, pool_list=None):
+    # TODO: Replace me with ceph_api commands
+    """
+    Retrieve a specific named cephx key
+    :param name: String Name of key to get.
+    :param pool_list:  The list of pools to give access to
+    :param caps:  dict of cephx capabilities
+    :return: Returns a cephx key
+    """
     caps = caps or _default_caps
     cmd = [
         "sudo",
@@ -971,10 +981,17 @@ def get_named_key(name, caps=None):
     ]
     # Add capabilities
     for subsystem, subcaps in caps.iteritems():
+        if subsystem == 'osd':
+            if pool_list:
+                # This will output a string similar to:
+                # "pool=rgw pool=rbd pool=something"
+                pools = " ".join(['pool={0}'.format(i) for i in pool_list])
+                subcaps[0] = subcaps[0] + " " + pools
         cmd.extend([
             subsystem,
             '; '.join(subcaps),
         ])
+    log("Calling subprocess.check_output: {}".format(cmd), level=DEBUG)
     return parse_key(subprocess.check_output(cmd).strip())  # IGNORE:E1103
 
 
