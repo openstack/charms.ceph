@@ -22,7 +22,7 @@ from charmhelpers.core.hookenv import (
     INFO,
     ERROR,
 )
-from charmhelpers.contrib.storage.linux.ceph  import (
+from charmhelpers.contrib.storage.linux.ceph import (
     create_erasure_profile,
     delete_pool,
     erasure_profile_exists,
@@ -191,7 +191,7 @@ def handle_replicated_pool(request, service):
     replicas = request.get('replicas')
     quota = request.get('max-bytes')
     weight = request.get('weight')
-   
+
     # Optional params
     pg_num = request.get('pg_num')
     if pg_num:
