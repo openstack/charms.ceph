@@ -48,7 +48,6 @@ from utils import (
     get_unit_hostname,
 )
 
-
 LEADER = 'leader'
 PEON = 'peon'
 QUORUM = [LEADER, PEON]
@@ -921,8 +920,10 @@ _upgrade_caps = {
 }
 
 
-def get_radosgw_key():
-    return get_named_key('radosgw.gateway', _radosgw_caps)
+def get_radosgw_key(pool_list):
+    return get_named_key(name='radosgw.gateway',
+                         caps=_radosgw_caps,
+                         pool_list=pool_list)
 
 
 _default_caps = {
@@ -955,7 +956,14 @@ def get_upgrade_key():
     return get_named_key('upgrade-osd', _upgrade_caps)
 
 
-def get_named_key(name, caps=None):
+def get_named_key(name, caps=None, pool_list=None):
+    """
+    Retrieve a specific named cephx key
+    :param name: String Name of key to get.
+    :param pool_list:  The list of pools to give access to
+    :param caps:  dict of cephx capabilities
+    :return: Returns a cephx key
+    """
     caps = caps or _default_caps
     cmd = [
         "sudo",
@@ -971,10 +979,14 @@ def get_named_key(name, caps=None):
     ]
     # Add capabilities
     for subsystem, subcaps in caps.iteritems():
-        cmd.extend([
-            subsystem,
-            '; '.join(subcaps),
-        ])
+        if subsystem == 'osd':
+            if pool_list:
+                # This will output a string similar to:
+                # "pool=rgw pool=rbd pool=something"
+                pools = " ".join(['pool={0}'.format(i) for i in pool_list])
+                subcaps[0] = subcaps[0] + " " + pools
+        cmd.extend([subsystem, '; '.join(subcaps)])
+    log("Calling subprocess.check_output: {}".format(cmd), level=DEBUG)
     return parse_key(subprocess.check_output(cmd).strip())  # IGNORE:E1103
 
 
