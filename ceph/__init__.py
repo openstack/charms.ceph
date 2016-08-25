@@ -932,7 +932,7 @@ _default_caps = {
 }
 
 admin_caps = {
-    'mds': ['allow'],
+    'mds': ['allow *'],
     'mon': ['allow *'],
     'osd': ['allow *']
 }
