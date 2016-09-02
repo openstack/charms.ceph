@@ -1237,7 +1237,7 @@ def roll_monitor_cluster(new_version):
             status_set('blocked',
                        'Waiting on {} to finish upgrading'.format(
                            mon_sorted_list[position - 1]))
-            wait_on_previous_node(service='mon', 
+            wait_on_previous_node(service='mon',
                                   previous_node=mon_sorted_list[position - 1],
                                   version=new_version)
             lock_and_roll(service='mon', my_name=my_name, version=new_version)
