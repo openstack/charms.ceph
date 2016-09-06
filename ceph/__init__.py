@@ -1201,6 +1201,37 @@ def get_running_osds():
         return []
 
 
+def wait_for_all_monitors_to_upgrade(new_version, upgrade_key):
+    """
+    Fairly self explanatory name.  This function will wait
+    for all monitors in the cluster to upgrade or it will
+    return after a timeout period has expired.
+    :param new_version: str of the version to watch
+    :param upgrade_key: the cephx key name to use
+    """
+    done = False
+    start_time = time.time()
+    monitor_list = []
+
+    mon_map = get_mon_map('admin')
+    if mon_map['monmap']['mons']:
+        for mon in mon_map['monmap']['mons']:
+            monitor_list.append(mon['name'])
+    while not done:
+        try:
+            done = all(monitor_key_exists(upgrade_key, "{}_{}_{}_done".format(
+                "mon", mon, new_version
+            )) for mon in monitor_list)
+            current_time = time.time()
+            if current_time > (start_time + 10*60):
+                raise Exception
+            else:
+                # Wait 30 seconds and test again if all monitors are upgraded
+                time.sleep(30)
+        except subprocess.CalledProcessError:
+            raise
+
+
 # Edge cases:
 # 1. Previous node dies on upgrade, can we retry?
 def roll_monitor_cluster(new_version, upgrade_key):
