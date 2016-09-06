@@ -24,7 +24,6 @@ import errno
 import shutil
 
 from charmhelpers.core import hookenv
-
 from charmhelpers.core.host import (
     mkdir,
     chownr,
@@ -50,6 +49,7 @@ from charmhelpers.contrib.storage.linux.utils import (
     is_block_device,
     zap_disk,
     is_device_mounted)
+
 from utils import (
     get_unit_hostname,
 )
@@ -1223,7 +1223,7 @@ def wait_for_all_monitors_to_upgrade(new_version, upgrade_key):
                 "mon", mon, new_version
             )) for mon in monitor_list)
             current_time = time.time()
-            if current_time > (start_time + 10*60):
+            if current_time > (start_time + 10 * 60):
                 raise Exception
             else:
                 # Wait 30 seconds and test again if all monitors are upgraded
@@ -1355,7 +1355,9 @@ def lock_and_roll(upgrade_key, service, my_name, version):
                                                   my_name,
                                                   version,
                                                   stop_timestamp))
-    monitor_key_set(upgrade_key, "{}_{}_{}_done".format(service, my_name, version),
+    monitor_key_set(upgrade_key, "{}_{}_{}_done".format(service,
+                                                        my_name,
+                                                        version),
                     stop_timestamp)
 
 
