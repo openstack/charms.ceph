@@ -1203,9 +1203,11 @@ def get_running_osds():
 
 # Edge cases:
 # 1. Previous node dies on upgrade, can we retry?
-def roll_monitor_cluster(new_version):
+def roll_monitor_cluster(new_version, upgrade_key):
     """
     This is tricky to get right so here's what we're going to do.
+    :param new_version: str of the version to upgrade to
+    :param upgrade_key: the cephx key name to use when upgrading
     There's 2 possible cases: Either I'm first in line or not.
     If I'm not first in line I'll wait a random time between 5-30 seconds
     and test to see if the previous monitor is upgraded yet.
@@ -1231,16 +1233,23 @@ def roll_monitor_cluster(new_version):
         if position == 0:
             # I'm first!  Roll
             # First set a key to inform others I'm about to roll
-            lock_and_roll(service='mon', my_name=my_name, version=new_version)
+            lock_and_roll(upgrade_key=upgrade_key,
+                          service='mon',
+                          my_name=my_name,
+                          version=new_version)
         else:
             # Check if the previous node has finished
             status_set('blocked',
                        'Waiting on {} to finish upgrading'.format(
                            mon_sorted_list[position - 1]))
-            wait_on_previous_node(service='mon',
+            wait_on_previous_node(upgrade_key=upgrade_key,
+                                  service='mon',
                                   previous_node=mon_sorted_list[position - 1],
                                   version=new_version)
-            lock_and_roll(service='mon', my_name=my_name, version=new_version)
+            lock_and_roll(upgrade_key=upgrade_key,
+                          service='mon',
+                          my_name=my_name,
+                          version=new_version)
     except ValueError:
         log("Failed to find {} in list {}.".format(
             my_name, mon_sorted_list))
@@ -1287,7 +1296,7 @@ def upgrade_monitor():
         sys.exit(1)
 
 
-def lock_and_roll(service, my_name, version):
+def lock_and_roll(upgrade_key, service, my_name, version):
     start_timestamp = time.time()
 
     log('monitor_key_set {}_{}_{}_start {}'.format(
@@ -1295,11 +1304,18 @@ def lock_and_roll(service, my_name, version):
         my_name,
         version,
         start_timestamp))
-    monitor_key_set('osd-upgrade', "{}_{}_{}_start".format(
+    monitor_key_set(upgrade_key, "{}_{}_{}_start".format(
         service, my_name, version), start_timestamp)
     log("Rolling")
+
     # This should be quick
-    upgrade_osd()
+    if service == 'osd':
+        upgrade_osd()
+    elif service == 'mon':
+        upgrade_monitor()
+    else:
+        log("Unknown service {}.  Unable to upgrade".format(service),
+            level=ERROR)
     log("Done")
 
     stop_timestamp = time.time()
@@ -1308,15 +1324,15 @@ def lock_and_roll(service, my_name, version):
                                                   my_name,
                                                   version,
                                                   stop_timestamp))
-    monitor_key_set('osd-upgrade', "{}_{}_{}_done".format(service, my_name, version),
+    monitor_key_set(upgrade_key, "{}_{}_{}_done".format(service, my_name, version),
                     stop_timestamp)
 
 
-def wait_on_previous_node(service, previous_node, version):
+def wait_on_previous_node(upgrade_key, service, previous_node, version):
     log("Previous node is: {}".format(previous_node))
 
     previous_node_finished = monitor_key_exists(
-        'osd-upgrade',
+        upgrade_key,
         "{}_{}_{}_done".format(service, previous_node, version))
 
     while previous_node_finished is False:
@@ -1330,7 +1346,7 @@ def wait_on_previous_node(service, previous_node, version):
         # the previous node even though it shouldn't.
         current_timestamp = time.time()
         previous_node_start_time = monitor_key_get(
-            'osd-upgrade',
+            upgrade_key,
             "{}_{}_{}_start".format(service, previous_node, version))
         if (current_timestamp - (10 * 60)) > previous_node_start_time:
             # Previous node is probably dead.  Lets move on
@@ -1349,7 +1365,7 @@ def wait_on_previous_node(service, previous_node, version):
             log('waiting for {} seconds'.format(wait_time))
             time.sleep(wait_time)
             previous_node_finished = monitor_key_exists(
-                'osd-upgrade',
+                upgrade_key,
                 "{}_{}_{}_done".format(service, previous_node, version))
 
 
@@ -1364,9 +1380,11 @@ def get_upgrade_position(osd_sorted_list, match_name):
 # 1. Previous node dies on upgrade, can we retry?
 # 2. This assumes that the osd failure domain is not set to osd.
 #    It rolls an entire server at a time.
-def roll_osd_cluster(new_version):
+def roll_osd_cluster(new_version, upgrade_key):
     """
     This is tricky to get right so here's what we're going to do.
+    :param new_version: str of the version to upgrade to
+    :param upgrade_key: the cephx key name to use when upgrading
     There's 2 possible cases: Either I'm first in line or not.
     If I'm not first in line I'll wait a random time between 5-30 seconds
     and test to see if the previous osd is upgraded yet.
@@ -1381,7 +1399,7 @@ def roll_osd_cluster(new_version):
     """
     log('roll_osd_cluster called with {}'.format(new_version))
     my_name = socket.gethostname()
-    osd_tree = get_osd_tree(service='osd-upgrade')
+    osd_tree = get_osd_tree(service=upgrade_key)
     # A sorted list of osd unit names
     osd_sorted_list = sorted(osd_tree)
     log("osd_sorted_list: {}".format(osd_sorted_list))
@@ -1392,17 +1410,24 @@ def roll_osd_cluster(new_version):
         if position == 0:
             # I'm first!  Roll
             # First set a key to inform others I'm about to roll
-            lock_and_roll(service='osd', my_name=my_name, version=new_version)
+            lock_and_roll(upgrade_key=upgrade_key,
+                          service='osd',
+                          my_name=my_name,
+                          version=new_version)
         else:
             # Check if the previous node has finished
             status_set('blocked',
                        'Waiting on {} to finish upgrading'.format(
                            osd_sorted_list[position - 1].name))
             wait_on_previous_node(
+                upgrade_key=upgrade_key,
                 service='osd',
                 previous_node=osd_sorted_list[position - 1].name,
                 version=new_version)
-            lock_and_roll(service='osd', my_name=my_name, version=new_version)
+            lock_and_roll(upgrade_key=upgrade_key,
+                          service='osd',
+                          my_name=my_name,
+                          version=new_version)
     except ValueError:
         log("Failed to find name {} in list {}".format(
             my_name, osd_sorted_list))
