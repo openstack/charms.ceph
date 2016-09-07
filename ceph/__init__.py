@@ -50,10 +50,6 @@ from charmhelpers.contrib.storage.linux.utils import (
     zap_disk,
     is_device_mounted)
 
-from utils import (
-    get_unit_hostname,
-)
-
 LEADER = 'leader'
 PEON = 'peon'
 QUORUM = [LEADER, PEON]
@@ -572,7 +568,7 @@ def error_out(msg):
 
 
 def is_quorum():
-    asok = "/var/run/ceph/ceph-mon.{}.asok".format(get_unit_hostname())
+    asok = "/var/run/ceph/ceph-mon.{}.asok".format(socket.gethostname())
     cmd = [
         "sudo",
         "-u",
@@ -599,7 +595,7 @@ def is_quorum():
 
 
 def is_leader():
-    asok = "/var/run/ceph/ceph-mon.{}.asok".format(get_unit_hostname())
+    asok = "/var/run/ceph/ceph-mon.{}.asok".format(socket.gethostname())
     cmd = [
         "sudo",
         "-u",
@@ -632,7 +628,7 @@ def wait_for_quorum():
 
 
 def add_bootstrap_hint(peer):
-    asok = "/var/run/ceph/ceph-mon.{}.asok".format(get_unit_hostname())
+    asok = "/var/run/ceph/ceph-mon.{}.asok".format(socket.gethostname())
     cmd = [
         "sudo",
         "-u",
@@ -979,7 +975,7 @@ def get_named_key(name, caps=None, pool_list=None):
         '--name', 'mon.',
         '--keyring',
         '/var/lib/ceph/mon/ceph-{}/keyring'.format(
-            get_unit_hostname()
+            socket.gethostname()
         ),
         'auth', 'get-or-create', 'client.{}'.format(name),
     ]
@@ -1015,7 +1011,7 @@ def systemd():
 
 
 def bootstrap_monitor_cluster(secret):
-    hostname = get_unit_hostname()
+    hostname = socket.gethostname()
     path = '/var/lib/ceph/mon/ceph-{}'.format(hostname)
     done = '{}/done'.format(path)
     if systemd():
@@ -1060,7 +1056,7 @@ def bootstrap_monitor_cluster(secret):
 
 
 def update_monfs():
-    hostname = get_unit_hostname()
+    hostname = socket.gethostname()
     monfs = '/var/lib/ceph/mon/ceph-{}'.format(hostname)
     if systemd():
         init_marker = '{}/systemd'.format(monfs)

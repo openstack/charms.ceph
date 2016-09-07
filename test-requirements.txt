@@ -7,3 +7,4 @@ flake8>=2.2.4,<=2.4.1
 os-testr>=0.4.1
 charm-tools>=2.0.0
 requests==2.6.0
+netifaces
