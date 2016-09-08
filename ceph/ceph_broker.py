@@ -15,6 +15,8 @@
 # limitations under the License.
 
 import json
+import os
+from tempfile import NamedTemporaryFile
 
 from charmhelpers.core.hookenv import (
     log,
@@ -42,6 +44,8 @@ from charmhelpers.contrib.storage.linux.ceph import (
 # This comes from http://docs.ceph.com/docs/master/rados/operations/pools/
 # This should do a decent job of preventing people from passing in bad values.
 # It will give a useful error message
+from subprocess import check_output, CalledProcessError
+
 POOL_KEYS = {
     # "Ceph Key Name": [Python type, [Valid Range]]
     "size": [int],
@@ -289,6 +293,136 @@ def handle_set_pool_value(request, service):
              value=params['value'])
 
 
+def handle_rgw_regionmap_update(request, service):
+    name = request.get('client-name')
+    if not name:
+        msg = "Missing rgw-region or client-name params"
+        log(msg, level=ERROR)
+        return {'exit-code': 1, 'stderr': msg}
+    try:
+        check_output(['radosgw-admin',
+                      '--id', service,
+                      'regionmap', 'update', '--name', name])
+    except CalledProcessError as err:
+        log(err.output, level=ERROR)
+        return {'exit-code': 1, 'stderr': err.output}
+
+
+def handle_rgw_regionmap_default(request, service):
+    region = request.get('rgw-region')
+    name = request.get('client-name')
+    if not region or not name:
+        msg = "Missing rgw-region or client-name params"
+        log(msg, level=ERROR)
+        return {'exit-code': 1, 'stderr': msg}
+    try:
+        check_output(
+            [
+                'radosgw-admin',
+                '--id', service,
+                'regionmap',
+                'default',
+                '--rgw-region', region,
+                '--name', name])
+    except CalledProcessError as err:
+        log(err.output, level=ERROR)
+        return {'exit-code': 1, 'stderr': err.output}
+
+
+def handle_rgw_zone_set(request, service):
+    json_file = request.get('zone-json')
+    name = request.get('client-name')
+    region_name = request.get('region-name')
+    zone_name = request.get('zone-name')
+    if not json_file or not name or not region_name or not zone_name:
+        msg = "Missing json-file or client-name params"
+        log(msg, level=ERROR)
+        return {'exit-code': 1, 'stderr': msg}
+    infile = NamedTemporaryFile(delete=False)
+    with open(infile.name, 'w') as infile_handle:
+        infile_handle.write(json_file)
+    try:
+        check_output(
+            [
+                'radosgw-admin',
+                '--id', service,
+                'zone',
+                'set',
+                '--rgw-zone', zone_name,
+                '--infile', infile.name,
+                '--name', name,
+            ]
+        )
+    except CalledProcessError as err:
+        log(err.output, level=ERROR)
+        return {'exit-code': 1, 'stderr': err.output}
+    os.unlink(infile.name)
+
+
+def handle_rgw_create_user(request, service):
+    user_id = request.get('rgw-uid')
+    display_name = request.get('display-name')
+    name = request.get('client-name')
+    if not name or not display_name or not user_id:
+        msg = "Missing client-name, display-name or rgw-uid"
+        log(msg, level=ERROR)
+        return {'exit-code': 1, 'stderr': msg}
+    try:
+        create_output = check_output(
+            [
+                'radosgw-admin',
+                '--id', service,
+                'user',
+                'create',
+                '--uid', user_id,
+                '--display-name', display_name,
+                '--name', name,
+                '--system'
+            ]
+        )
+        try:
+            user_json = json.loads(create_output)
+            return {'exit-code': 0, 'user': user_json}
+        except ValueError as err:
+            log(err, level=ERROR)
+            return {'exit-code': 1, 'stderr': err}
+
+    except CalledProcessError as err:
+        log(err.output, level=ERROR)
+        return {'exit-code': 1, 'stderr': err.output}
+
+
+def handle_rgw_region_set(request, service):
+    # radosgw-admin region set --infile us.json --name client.radosgw.us-east-1
+    json_file = request.get('region-json')
+    name = request.get('client-name')
+    region_name = request.get('region-name')
+    zone_name = request.get('zone-name')
+    if not json_file or not name or not region_name or not zone_name:
+        msg = "Missing json-file or client-name params"
+        log(msg, level=ERROR)
+        return {'exit-code': 1, 'stderr': msg}
+    infile = NamedTemporaryFile(delete=False)
+    with open(infile.name, 'w') as infile_handle:
+        infile_handle.write(json_file)
+    try:
+        check_output(
+            [
+                'radosgw-admin',
+                '--id', service,
+                'region',
+                'set',
+                '--rgw-zone', zone_name,
+                '--infile', infile.name,
+                '--name', name,
+            ]
+        )
+    except CalledProcessError as err:
+        log(err.output, level=ERROR)
+        return {'exit-code': 1, 'stderr': err.output}
+    os.unlink(infile.name)
+
+
 def process_requests_v1(reqs):
     """Process v1 requests.
 
@@ -341,6 +475,16 @@ def process_requests_v1(reqs):
                                        snapshot_name=snapshot_name)
         elif op == "set-pool-value":
             ret = handle_set_pool_value(request=req, service=svc)
+        elif op == "rgw-region-set":
+            ret = handle_rgw_region_set(request=req, service=svc)
+        elif op == "rgw-zone-set":
+            ret = handle_rgw_zone_set(request=req, service=svc)
+        elif op == "rgw-regionmap-update":
+            ret = handle_rgw_regionmap_update(request=req, service=svc)
+        elif op == "rgw-regionmap-default":
+            ret = handle_rgw_regionmap_default(request=req, service=svc)
+        elif op == "rgw-create-user":
+            ret = handle_rgw_create_user(request=req, service=svc)
         else:
             msg = "Unknown operation '%s'" % op
             log(msg, level=ERROR)
