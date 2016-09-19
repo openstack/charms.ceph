@@ -928,6 +928,12 @@ def get_radosgw_key(pool_list):
                          pool_list=pool_list)
 
 
+def get_mds_key(name):
+    return create_named_keyring(entity='mds',
+                                name=name,
+                                caps=mds_caps)
+
+
 _default_caps = {
     'mon': ['allow rw'],
     'osd': ['allow rwx']
@@ -937,6 +943,12 @@ admin_caps = {
     'mds': ['allow *'],
     'mon': ['allow *'],
     'osd': ['allow *']
+}
+
+mds_caps = {
+    'osd': ['allow *'],
+    'mds': ['allow'],
+    'mon': ['allow rwx'],
 }
 
 osd_upgrade_caps = {
@@ -952,6 +964,27 @@ osd_upgrade_caps = {
             'allow command "auth del"',
             ]
 }
+
+
+def create_named_keyring(entity, name, caps=None):
+    caps = caps or _default_caps
+    cmd = [
+        "sudo",
+        "-u",
+        ceph_user(),
+        'ceph',
+        '--name', 'mon.',
+        '--keyring',
+        '/var/lib/ceph/mon/ceph-{}/keyring'.format(
+            socket.gethostname()
+        ),
+        'auth', 'get-or-create', '{entity}.{name}'.format(entity=entity,
+                                                          name=name),
+    ]
+    for subsystem, subcaps in caps.iteritems():
+        cmd.extend([subsystem, '; '.join(subcaps)])
+    log("Calling subprocess.check_output: {}".format(cmd), level=DEBUG)
+    return parse_key(subprocess.check_output(cmd).strip())  # IGNORE:E1103
 
 
 def get_upgrade_key():
