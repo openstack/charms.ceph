@@ -55,7 +55,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
     @patch('ceph.upgrade_monitor')
     @patch('ceph.monitor_key_set')
     def test_lock_and_roll(self, monitor_key_set, upgrade_monitor, log, time):
-        time.return_value = 1473279502.688828
+        time.return_value = 1473279502.69
         monitor_key_set.monitor_key_set.return_value = None
         ceph.lock_and_roll(my_name='ip-192-168-1-2',
                            version='0.94.1',
@@ -67,7 +67,9 @@ class UpgradeRollingTestCase(unittest.TestCase):
                 call('monitor_key_set '
                      'mon_ip-192-168-1-2_0.94.1_start 1473279502.69'),
                 call('Rolling'),
-                call('Done')
+                call('Done'),
+                call('monitor_key_set '
+                     'mon_ip-192-168-1-2_0.94.1_done 1473279502.69'),
             ])
 
     @patch('ceph.apt_install')
@@ -87,7 +89,6 @@ class UpgradeRollingTestCase(unittest.TestCase):
                              local_mons, add_source, apt_update, status_set,
                              log, service_start, service_stop, chownr,
                              apt_install):
-        print "Upgrading monitor"
         get_version.return_value = "0.80"
         config.side_effect = config_side_effect
         ceph_user.return_value = "ceph"

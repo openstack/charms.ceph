@@ -41,7 +41,6 @@ class CephBrokerTestCase(unittest.TestCase):
     def test_process_requests_invalid_api_version(self, mock_log):
         req = json.dumps({'api-version': 2, 'ops': []})
         rc = ceph_broker.process_requests(req)
-        print "Return: %s" % rc
         self.assertEqual(json.loads(rc),
                          {'exit-code': 1,
                           'stderr': 'Missing or invalid api version (2)'})
