@@ -15,7 +15,7 @@
 import mock
 import unittest
 
-import ceph.ceph as ceph
+import ceph
 
 
 class CephTestCase(unittest.TestCase):
@@ -26,7 +26,7 @@ class CephTestCase(unittest.TestCase):
         with mock.patch.object(ceph, "ceph_user", return_value="ceph"):
             with mock.patch.object(ceph.subprocess, "check_output") \
                     as subprocess:
-                with mock.patch.object(ceph, "get_unit_hostname",
+                with mock.patch.object(ceph.socket, "gethostname",
                                        return_value="osd001"):
                     ceph.get_named_key(name="rgw001",
                                        pool_list=["rbd", "block"])
@@ -43,7 +43,7 @@ class CephTestCase(unittest.TestCase):
         with mock.patch.object(ceph, "ceph_user", return_value="ceph"):
             with mock.patch.object(ceph.subprocess, "check_output") \
                     as subprocess:
-                with mock.patch.object(ceph, "get_unit_hostname",
+                with mock.patch.object(ceph.socket, "gethostname",
                                        return_value="osd001"):
                     ceph.get_named_key(name="rgw001")
                     subprocess.assert_called_with(

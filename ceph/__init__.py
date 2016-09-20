@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import ctypes
+import collections
 import json
 import random
 import socket
@@ -54,7 +55,8 @@ LEADER = 'leader'
 PEON = 'peon'
 QUORUM = [LEADER, PEON]
 
-PACKAGES = ['ceph', 'gdisk', 'ntp', 'btrfs-tools', 'python-ceph', 'radosgw', 'xfsprogs']
+PACKAGES = ['ceph', 'gdisk', 'ntp', 'btrfs-tools', 'python-ceph',
+            'radosgw', 'xfsprogs']
 
 LinkSpeed = {
     "BASE_10": 10,
@@ -934,36 +936,36 @@ def get_mds_key(name):
                                 caps=mds_caps)
 
 
-_default_caps = {
-    'mon': ['allow rw'],
-    'osd': ['allow rwx']
-}
+_default_caps = collections.OrderedDict([
+    ('mon', ['allow rw']),
+    ('osd', ['allow rwx']),
+])
 
-admin_caps = {
-    'mds': ['allow *'],
-    'mon': ['allow *'],
-    'osd': ['allow *']
-}
+admin_caps = collections.OrderedDict([
+    ('mds', ['allow *']),
+    ('mon', ['allow *']),
+    ('osd', ['allow *'])
+])
 
-mds_caps = {
-    'osd': ['allow *'],
-    'mds': ['allow'],
-    'mon': ['allow rwx'],
-}
+mds_caps = collections.OrderedDict([
+    ('osd', ['allow *']),
+    ('mds', ['allow']),
+    ('mon', ['allow rwx']),
+])
 
-osd_upgrade_caps = {
-    'mon': ['allow command "config-key"',
-            'allow command "osd tree"',
-            'allow command "config-key list"',
-            'allow command "config-key put"',
-            'allow command "config-key get"',
-            'allow command "config-key exists"',
-            'allow command "osd out"',
-            'allow command "osd in"',
-            'allow command "osd rm"',
-            'allow command "auth del"',
-            ]
-}
+osd_upgrade_caps = collections.OrderedDict([
+    ('mon', ['allow command "config-key"',
+             'allow command "osd tree"',
+             'allow command "config-key list"',
+             'allow command "config-key put"',
+             'allow command "config-key get"',
+             'allow command "config-key exists"',
+             'allow command "osd out"',
+             'allow command "osd in"',
+             'allow command "osd rm"',
+             'allow command "auth del"',
+             ])
+])
 
 
 def create_named_keyring(entity, name, caps=None):
@@ -981,7 +983,7 @@ def create_named_keyring(entity, name, caps=None):
         'auth', 'get-or-create', '{entity}.{name}'.format(entity=entity,
                                                           name=name),
     ]
-    for subsystem, subcaps in caps.iteritems():
+    for subsystem, subcaps in caps.items():
         cmd.extend([subsystem, '; '.join(subcaps)])
     log("Calling subprocess.check_output: {}".format(cmd), level=DEBUG)
     return parse_key(subprocess.check_output(cmd).strip())  # IGNORE:E1103
@@ -1013,7 +1015,7 @@ def get_named_key(name, caps=None, pool_list=None):
         'auth', 'get-or-create', 'client.{}'.format(name),
     ]
     # Add capabilities
-    for subsystem, subcaps in caps.iteritems():
+    for subsystem, subcaps in caps.items():
         if subsystem == 'osd':
             if pool_list:
                 # This will output a string similar to:
@@ -1033,7 +1035,7 @@ def upgrade_key_caps(key, caps):
     cmd = [
         "sudo", "-u", ceph_user(), 'ceph', 'auth', 'caps', key
     ]
-    for subsystem, subcaps in caps.iteritems():
+    for subsystem, subcaps in caps.items():
         cmd.extend([subsystem, '; '.join(subcaps)])
     subprocess.check_call(cmd)
 
