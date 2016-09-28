@@ -392,6 +392,44 @@ def handle_rgw_create_user(request, service):
         return {'exit-code': 1, 'stderr': err.output}
 
 
+def handle_create_cephfs(request, service):
+    """
+    Create a new cephfs.
+    :param request: The broker request
+    :param service: The cephx user to run this command under
+    :return:
+    """
+    cephfs_name = request.get('mds_name')
+    data_pool = request.get('data_pool')
+    metadata_pool = request.get('metadata_pool')
+    # Check if the user params were provided
+    if not cephfs_name or not data_pool or not metadata_pool:
+        msg = "Missing mds_name, data_pool or metadata_pool params"
+        log(msg, level=ERROR)
+        return {'exit-code': 1, 'stderr': msg}
+
+    # Sanity check that the required pools exist
+    if not pool_exists(service=service, name=data_pool):
+        msg = "CephFS data pool does not exist.  Cannot create CephFS"
+        log(msg, level=ERROR)
+        return {'exit-code': 1, 'stderr': msg}
+    if not pool_exists(service=service, name=metadata_pool):
+        msg = "CephFS metadata pool does not exist.  Cannot create CephFS"
+        log(msg, level=ERROR)
+        return {'exit-code': 1, 'stderr': msg}
+
+    # Finally create CephFS
+    try:
+        check_output(["ceph",
+                      '--id', service,
+                      "fs", "new", cephfs_name,
+                      metadata_pool,
+                      data_pool])
+    except CalledProcessError as err:
+        log(err.output, level=ERROR)
+        return {'exit-code': 1, 'stderr': err.output}
+
+
 def handle_rgw_region_set(request, service):
     # radosgw-admin region set --infile us.json --name client.radosgw.us-east-1
     json_file = request.get('region-json')
@@ -448,7 +486,8 @@ def process_requests_v1(reqs):
                 ret = handle_erasure_pool(request=req, service=svc)
             else:
                 ret = handle_replicated_pool(request=req, service=svc)
-
+        elif op == "create-cephfs":
+            ret = handle_create_cephfs(request=req, service=svc)
         elif op == "create-cache-tier":
             ret = handle_create_cache_tier(request=req, service=svc)
         elif op == "remove-cache-tier":
