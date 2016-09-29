@@ -18,6 +18,8 @@ import unittest
 
 import ceph_broker
 
+from mock import call
+
 
 class CephBrokerTestCase(unittest.TestCase):
     def setUp(self):
@@ -107,6 +109,37 @@ class CephBrokerTestCase(unittest.TestCase):
         mock_replicated_pool.assert_called_with(service='admin',
                                                 name='foo',
                                                 replicas=3)
+        self.assertEqual(json.loads(rc)['exit-code'], 0)
+        self.assertEqual(json.loads(rc)['request-id'], '1ef5aede')
+
+    @mock.patch('ceph_broker.check_output')
+    @mock.patch('ceph_broker.pool_exists')
+    @mock.patch('ceph_broker.log')
+    def test_process_requests_create_cephfs(self,
+                                            mock_log,
+                                            mock_pool_exists,
+                                            check_output):
+        mock_pool_exists.return_value = True
+        reqs = json.dumps({'api-version': 1,
+                           'request-id': '1ef5aede',
+                           'ops': [{
+                               'op': 'create-cephfs',
+                               'mds_name': 'foo',
+                               'data_pool': 'data',
+                               'metadata_pool': 'metadata',
+                           }]})
+        rc = ceph_broker.process_requests(reqs)
+        mock_pool_exists.assert_has_calls(
+            [
+                call(service='admin', name='data'),
+                call(service='admin', name='metadata'),
+            ])
+        check_output.assert_called_with(["ceph",
+                                         '--id', 'admin',
+                                         "fs", "new", 'foo',
+                                         'metadata',
+                                         'data'])
+
         self.assertEqual(json.loads(rc)['exit-code'], 0)
         self.assertEqual(json.loads(rc)['request-id'], '1ef5aede')
 
