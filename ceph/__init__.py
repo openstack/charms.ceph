@@ -936,6 +936,18 @@ def get_mds_key(name):
                                 caps=mds_caps)
 
 
+_mds_bootstrap_caps_profile = {
+    'mon': [
+        'allow profile bootstrap-mds'
+    ]
+}
+
+
+def get_mds_bootstrap_key():
+    return get_named_key('bootstrap-mds',
+                         _mds_bootstrap_caps_profile)
+
+
 _default_caps = collections.OrderedDict([
     ('mon', ['allow rw']),
     ('osd', ['allow rwx']),
