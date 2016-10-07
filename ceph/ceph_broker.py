@@ -24,6 +24,7 @@ from charmhelpers.core.hookenv import (
     INFO,
     ERROR,
 )
+from ceph import get_cephfs
 from charmhelpers.contrib.storage.linux.ceph import (
     create_erasure_profile,
     delete_pool,
@@ -418,7 +419,12 @@ def handle_create_cephfs(request, service):
         log(msg, level=ERROR)
         return {'exit-code': 1, 'stderr': msg}
 
-    # Finally create CephFS
+    if get_cephfs(service=service):
+        # CephFS new has already been called
+        log("CephFS already created")
+        return
+
+        # Finally create CephFS
     try:
         check_output(["ceph",
                       '--id', service,
@@ -426,8 +432,12 @@ def handle_create_cephfs(request, service):
                       metadata_pool,
                       data_pool])
     except CalledProcessError as err:
-        log(err.output, level=ERROR)
-        return {'exit-code': 1, 'stderr': err.output}
+        if err.returncode == 22:
+            log("CephFS already created")
+            return
+        else:
+            log(err.output, level=ERROR)
+            return {'exit-code': 1, 'stderr': err.output}
 
 
 def handle_rgw_region_set(request, service):

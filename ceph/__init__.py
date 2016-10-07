@@ -1244,6 +1244,37 @@ def get_running_osds():
         return []
 
 
+def get_cephfs(service):
+    """
+    List the Ceph Filesystems that exist
+    :rtype : list.  Returns a list of the ceph filesystems
+    :param service:  The service name to run the ceph command under
+    """
+    if get_version() < 0.86:
+        # This command wasn't introduced until 0.86 ceph
+        return []
+    try:
+        output = subprocess.check_output(["ceph",
+                                          '--id', service,
+                                          "fs", "ls"])
+        if not output:
+            return []
+        """
+        Example subprocess output:
+        'name: ip-172-31-23-165, metadata pool: ip-172-31-23-165_metadata,
+         data pools: [ip-172-31-23-165_data ]\n'
+        output: filesystems: ['ip-172-31-23-165']
+        """
+        filesystems = []
+        for line in output.splitlines():
+            parts = line.split(',')
+            for part in parts:
+                if "name" in part:
+                    filesystems.append(part.split(' ')[1])
+    except subprocess.CalledProcessError:
+        return []
+
+
 def wait_for_all_monitors_to_upgrade(new_version, upgrade_key):
     """
     Fairly self explanatory name.  This function will wait

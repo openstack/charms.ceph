@@ -112,13 +112,16 @@ class CephBrokerTestCase(unittest.TestCase):
         self.assertEqual(json.loads(rc)['exit-code'], 0)
         self.assertEqual(json.loads(rc)['request-id'], '1ef5aede')
 
+    @mock.patch('ceph_broker.get_cephfs')
     @mock.patch('ceph_broker.check_output')
     @mock.patch('ceph_broker.pool_exists')
     @mock.patch('ceph_broker.log')
     def test_process_requests_create_cephfs(self,
                                             mock_log,
                                             mock_pool_exists,
-                                            check_output):
+                                            check_output,
+                                            get_cephfs):
+        get_cephfs.return_value = []
         mock_pool_exists.return_value = True
         reqs = json.dumps({'api-version': 1,
                            'request-id': '1ef5aede',
