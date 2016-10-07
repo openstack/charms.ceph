@@ -1578,3 +1578,22 @@ def upgrade_osd():
             "with message: {}".format(err.message))
         status_set("blocked", "Upgrade to {} failed".format(new_version))
         sys.exit(1)
+
+
+def list_pools(service):
+    """
+    This will list the current pools that Ceph has
+
+    :param service: String service id to run under
+    :return: list.  Returns a list of the ceph pools. Raises CalledProcessError
+    if the subprocess fails to run.
+    """
+    try:
+        pool_list = []
+        pools = subprocess.check_output(['rados', '--id', service, 'lspools'])
+        for pool in pools.splitlines():
+            pool_list.append(pool)
+        return pool_list
+    except subprocess.CalledProcessError as err:
+        log("rados lspools failed with error: {}".format(err.output))
+        raise
