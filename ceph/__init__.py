@@ -949,7 +949,7 @@ def get_mds_bootstrap_key():
 
 
 _default_caps = collections.OrderedDict([
-    ('mon', ['allow rw']),
+    ('mon', ['allow r']),
     ('osd', ['allow rwx']),
 ])
 

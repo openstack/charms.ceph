@@ -35,7 +35,7 @@ class CephTestCase(unittest.TestCase):
                          '--keyring',
                          '/var/lib/ceph/mon/ceph-osd001/keyring',
                          'auth',
-                         'get-or-create', 'client.rgw001', 'mon', 'allow rw',
+                         'get-or-create', 'client.rgw001', 'mon', 'allow r',
                          'osd',
                          'allow rwx pool=rbd pool=block'])
 
@@ -51,6 +51,6 @@ class CephTestCase(unittest.TestCase):
                          '--keyring',
                          '/var/lib/ceph/mon/ceph-osd001/keyring',
                          'auth',
-                         'get-or-create', 'client.rgw001', 'mon', 'allow rw',
+                         'get-or-create', 'client.rgw001', 'mon', 'allow r',
                          'osd',
                          'allow rwx'])
