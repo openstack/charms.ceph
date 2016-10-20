@@ -50,6 +50,8 @@ from charmhelpers.contrib.storage.linux.utils import (
     is_block_device,
     zap_disk,
     is_device_mounted)
+from charmhelpers.contrib.openstack.utils import (
+    get_os_codename_install_source)
 
 LEADER = 'leader'
 PEON = 'peon'
@@ -1597,3 +1599,39 @@ def list_pools(service):
     except subprocess.CalledProcessError as err:
         log("rados lspools failed with error: {}".format(err.output))
         raise
+
+
+# A dict of valid ceph upgrade paths.  Mapping is old -> new
+UPGRADE_PATHS = {
+    'firefly': 'hammer',
+    'hammer': 'jewel',
+}
+
+# Map UCA codenames to ceph codenames
+UCA_CODENAME_MAP = {
+    'icehouse': 'firefly',
+    'juno': 'firefly',
+    'kilo': 'hammer',
+    'liberty': 'hammer',
+    'mitaka': 'jewel',
+}
+
+
+def pretty_print_upgrade_paths():
+    '''Pretty print supported upgrade paths for ceph'''
+    lines = []
+    for key, value in UPGRADE_PATHS.iteritems():
+        lines.append("{} -> {}".format(key, value))
+    return lines
+
+
+def resolve_ceph_version(source):
+    '''
+    Resolves a version of ceph based on source configuration
+    based on Ubuntu Cloud Archive pockets.
+
+    @param: source: source configuration option of charm
+    @returns: ceph release codename or None if not resolvable
+    '''
+    os_release = get_os_codename_install_source(source)
+    return UCA_CODENAME_MAP.get(os_release)

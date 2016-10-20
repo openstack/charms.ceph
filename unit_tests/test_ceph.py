@@ -54,3 +54,21 @@ class CephTestCase(unittest.TestCase):
                          'get-or-create', 'client.rgw001', 'mon', 'allow r',
                          'osd',
                          'allow rwx'])
+
+
+class CephVersionTestCase(unittest.TestCase):
+
+    @mock.patch.object(ceph, 'get_os_codename_install_source')
+    def test_resolve_ceph_version_trusty(self, get_os_codename_install_source):
+        get_os_codename_install_source.return_value = 'juno'
+        self.assertEqual(ceph.resolve_ceph_version('cloud:trusty-juno'),
+                         'firefly')
+        get_os_codename_install_source.return_value = 'kilo'
+        self.assertEqual(ceph.resolve_ceph_version('cloud:trusty-kilo'),
+                         'hammer')
+        get_os_codename_install_source.return_value = 'liberty'
+        self.assertEqual(ceph.resolve_ceph_version('cloud:trusty-liberty'),
+                         'hammer')
+        get_os_codename_install_source.return_value = 'mitaka'
+        self.assertEqual(ceph.resolve_ceph_version('cloud:trusty-mitaka'),
+                         'jewel')
