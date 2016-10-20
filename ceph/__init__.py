@@ -1346,7 +1346,7 @@ def roll_monitor_cluster(new_version, upgrade_key):
                           version=new_version)
         else:
             # Check if the previous node has finished
-            status_set('blocked',
+            status_set('waiting',
                        'Waiting on {} to finish upgrading'.format(
                            mon_sorted_list[position - 1]))
             wait_on_previous_node(upgrade_key=upgrade_key,
@@ -1363,11 +1363,10 @@ def roll_monitor_cluster(new_version, upgrade_key):
         status_set('blocked', 'failed to upgrade monitor')
 
 
-def upgrade_monitor():
+def upgrade_monitor(new_version):
     current_version = get_version()
     status_set("maintenance", "Upgrading monitor")
     log("Current ceph version is {}".format(current_version))
-    new_version = config('release-version')
     log("Upgrading to: {}".format(new_version))
 
     try:
@@ -1395,7 +1394,6 @@ def upgrade_monitor():
                 service_start('ceph-mon@{}'.format(mon_id))
         else:
             service_start('ceph-mon-all')
-        status_set("active", "")
     except subprocess.CalledProcessError as err:
         log("Stopping ceph and upgrading packages failed "
             "with message: {}".format(err.message))
@@ -1417,9 +1415,9 @@ def lock_and_roll(upgrade_key, service, my_name, version):
 
     # This should be quick
     if service == 'osd':
-        upgrade_osd()
+        upgrade_osd(version)
     elif service == 'mon':
-        upgrade_monitor()
+        upgrade_monitor(version)
     else:
         log("Unknown service {}.  Unable to upgrade".format(service),
             level=ERROR)
@@ -1543,11 +1541,10 @@ def roll_osd_cluster(new_version, upgrade_key):
         status_set('blocked', 'failed to upgrade osd')
 
 
-def upgrade_osd():
+def upgrade_osd(new_version):
     current_version = get_version()
     status_set("maintenance", "Upgrading osd")
     log("Current ceph version is {}".format(current_version))
-    new_version = config('release-version')
     log("Upgrading to: {}".format(new_version))
 
     try:

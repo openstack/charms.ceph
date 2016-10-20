@@ -58,18 +58,18 @@ class UpgradeRollingTestCase(unittest.TestCase):
         time.return_value = 1473279502.69
         monitor_key_set.monitor_key_set.return_value = None
         ceph.lock_and_roll(my_name='ip-192-168-1-2',
-                           version='0.94.1',
+                           version='hammer',
                            service='mon',
                            upgrade_key='admin')
-        upgrade_monitor.assert_called_once_with()
+        upgrade_monitor.assert_called_once_with('hammer')
         log.assert_has_calls(
             [
                 call('monitor_key_set '
-                     'mon_ip-192-168-1-2_0.94.1_start 1473279502.69'),
+                     'mon_ip-192-168-1-2_hammer_start 1473279502.69'),
                 call('Rolling'),
                 call('Done'),
                 call('monitor_key_set '
-                     'mon_ip-192-168-1-2_0.94.1_done 1473279502.69'),
+                     'mon_ip-192-168-1-2_hammer_done 1473279502.69'),
             ])
 
     @patch('ceph.apt_install')
@@ -95,7 +95,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
         systemd.return_value = False
         local_mons.return_value = ['a']
 
-        ceph.upgrade_monitor()
+        ceph.upgrade_monitor('hammer')
         service_stop.assert_called_with('ceph-mon-all')
         service_start.assert_called_with('ceph-mon-all')
         add_source.assert_called_with('cloud:trusty-kilo', 'key')
@@ -103,12 +103,11 @@ class UpgradeRollingTestCase(unittest.TestCase):
         log.assert_has_calls(
             [
                 call('Current ceph version is 0.80'),
-                call('Upgrading to: cloud:trusty-kilo')
+                call('Upgrading to: hammer')
             ]
         )
         status_set.assert_has_calls([
             call('maintenance', 'Upgrading monitor'),
-            call('active', '')
         ])
         chownr.assert_has_calls(
             [
@@ -147,7 +146,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
         ceph.roll_monitor_cluster(new_version='0.94.1',
                                   upgrade_key='admin')
         status_set.assert_called_with(
-            'blocked',
+            'waiting',
             'Waiting on ip-192-168-1-2 to finish upgrading')
         lock_and_roll.assert_called_with(my_name='ip-192-168-1-3',
                                          service='mon',

@@ -84,7 +84,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
         systemd.return_value = False
         local_osds.return_value = [0, 1, 2]
 
-        ceph.upgrade_osd()
+        ceph.upgrade_osd('hammer')
         service_stop.assert_called_with('ceph-osd-all')
         service_start.assert_called_with('ceph-osd-all')
         status_set.assert_has_calls([
@@ -93,7 +93,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
         log.assert_has_calls(
             [
                 call('Current ceph version is 0.80'),
-                call('Upgrading to: cloud:trusty-kilo')
+                call('Upgrading to: hammer')
             ]
         )
         chownr.assert_has_calls(
