@@ -14,8 +14,23 @@
 
 import mock
 import unittest
-
 import ceph
+
+
+class TestDevice():
+    """Test class to mock out pyudev Device"""
+
+    def __getitem__(**kwargs):
+        """
+        Mock [].
+
+        We need this method to be present in the test class mock even
+        though we mock the return value with the MagicMock later
+        """
+        return "Some device type"
+
+    def device_node():
+        "/dev/test_device"
 
 
 class CephTestCase(unittest.TestCase):
@@ -54,6 +69,31 @@ class CephTestCase(unittest.TestCase):
                          'get-or-create', 'client.rgw001', 'mon', 'allow r',
                          'osd',
                          'allow rwx'])
+
+    def test_list_unmounted_devices(self):
+        dev1 = mock.MagicMock(spec=TestDevice)
+        dev1.__getitem__.return_value = "block"
+        dev1.device_node = '/dev/sda'
+        dev2 = mock.MagicMock(spec=TestDevice)
+        dev2.__getitem__.return_value = "block"
+        dev2.device_node = '/dev/sdb'
+        dev3 = mock.MagicMock(spec=TestDevice)
+        dev3.__getitem__.return_value = "block"
+        dev3.device_node = '/dev/loop1'
+        devices = [dev1, dev2, dev3]
+        with mock.patch(
+            'pyudev.Context.list_devices',
+                return_value=devices):
+                with mock.patch.object(ceph,
+                                       'is_device_mounted',
+                                       return_value=False):
+                    devices = ceph.unmounted_disks()
+                    self.assertEqual(devices, ['/dev/sda', '/dev/sdb'])
+                with mock.patch.object(ceph,
+                                       'is_device_mounted',
+                                       return_value=True):
+                    devices = ceph.unmounted_disks()
+                    self.assertEqual(devices, [])
 
 
 class CephVersionTestCase(unittest.TestCase):

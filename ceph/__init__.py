@@ -23,6 +23,7 @@ import re
 import sys
 import errno
 import shutil
+import pyudev
 
 from charmhelpers.core import hookenv
 from charmhelpers.core.host import (
@@ -58,7 +59,7 @@ PEON = 'peon'
 QUORUM = [LEADER, PEON]
 
 PACKAGES = ['ceph', 'gdisk', 'ntp', 'btrfs-tools', 'python-ceph',
-            'radosgw', 'xfsprogs']
+            'radosgw', 'xfsprogs', 'python-pyudev']
 
 LinkSpeed = {
     "BASE_10": 10,
@@ -100,6 +101,23 @@ NETWORK_ADAPTER_SYSCTLS = {
         'net.ipv4.tcp_adv_win_scale': 1
     }
 }
+
+
+def unmounted_disks():
+    """List of unmounted block devices on the current host."""
+    disks = []
+    context = pyudev.Context()
+    for device in context.list_devices(DEVTYPE='disk'):
+        if device['SUBSYSTEM'] == 'block':
+            matched = False
+            for block_type in [u'dm', u'loop', u'ram', u'nbd']:
+                if block_type in device.device_node:
+                    matched = True
+            if matched:
+                continue
+            disks.append(device.device_node)
+    log("Found disks: {}".format(disks))
+    return [disk for disk in disks if not is_device_mounted(disk)]
 
 
 def save_sysctls(sysctl_dict, save_location):
