@@ -2,6 +2,7 @@
 # of appearance. Changing the order has an impact on the overall integration
 # process, which may cause wedges in the gate later.
 coverage>=3.6
+nose
 mock>=1.2
 flake8>=2.2.4,<=2.4.1
 os-testr>=0.4.1
