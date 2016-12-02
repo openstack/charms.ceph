@@ -1216,12 +1216,12 @@ def osdize_dev(dev, osd_format, osd_journal, reformat_osd=False,
     try:
         log("osdize cmd: {}".format(cmd))
         subprocess.check_call(cmd)
-    except subprocess.CalledProcessError as e:
+    except subprocess.CalledProcessError:
         if ignore_errors:
             log('Unable to initialize device: {}'.format(dev), WARNING)
         else:
             log('Unable to initialize device: {}'.format(dev), ERROR)
-            raise e
+            raise
 
 
 def osdize_dir(path, encrypt=False):
