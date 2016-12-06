@@ -37,6 +37,73 @@ class CephTestCase(unittest.TestCase):
     def setUp(self):
         super(CephTestCase, self).setUp()
 
+    @mock.patch('subprocess.check_output')
+    def test_get_osd_weight(self, output):
+        """It gives an OSD's weight"""
+        output.return_value = """{
+    "nodes": [{
+        "id": -1,
+        "name": "default",
+        "type": "root",
+        "type_id": 10,
+        "children": [-4, -3, -2]
+    }, {
+        "id": -2,
+        "name": "ip-172-31-11-147",
+        "type": "host",
+        "type_id": 1,
+        "children": [0]
+    }, {
+        "id": 0,
+        "name": "osd.0",
+        "type": "osd",
+        "type_id": 0,
+        "crush_weight": 0.002899,
+        "depth": 2,
+        "exists": 1,
+        "status": "up",
+        "reweight": 1.000000,
+        "primary_affinity": 1.000000
+    }, {
+        "id": -3,
+        "name": "ip-172-31-56-198",
+        "type": "host",
+        "type_id": 1,
+        "children": [2]
+    }, {
+        "id": 2,
+        "name": "osd.2",
+        "type": "osd",
+        "type_id": 0,
+        "crush_weight": 0.002899,
+        "depth": 2,
+        "exists": 1,
+        "status": "up",
+        "reweight": 1.000000,
+        "primary_affinity": 1.000000
+    }, {
+        "id": -4,
+        "name": "ip-172-31-24-103",
+        "type": "host",
+        "type_id": 1,
+        "children": [1]
+    }, {
+        "id": 1,
+        "name": "osd.1",
+        "type": "osd",
+        "type_id": 0,
+        "crush_weight": 0.002899,
+        "depth": 2,
+        "exists": 1,
+        "status": "up",
+        "reweight": 1.000000,
+        "primary_affinity": 1.000000
+    }],
+    "stray": []
+}"""
+        weight = ceph.get_osd_weight('osd.0')
+        self.assertEqual(weight, 0.002899)
+
     def test_get_named_key_with_pool(self):
         with mock.patch.object(ceph, "ceph_user", return_value="ceph"):
             with mock.patch.object(ceph.subprocess, "check_output") \

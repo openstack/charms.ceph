@@ -146,6 +146,36 @@ class CephBrokerTestCase(unittest.TestCase):
         self.assertEqual(json.loads(rc)['exit-code'], 0)
         self.assertEqual(json.loads(rc)['request-id'], '1ef5aede')
 
+    @mock.patch('ceph_broker.check_output')
+    @mock.patch('ceph_helpers.Crushmap.load_crushmap')
+    @mock.patch('ceph_helpers.Crushmap.ensure_bucket_is_present')
+    @mock.patch('ceph_broker.get_osd_weight')
+    @mock.patch('ceph_broker.log')
+    def test_process_requests_move_osd(self,
+                                       mock_log,
+                                       get_osd_weight,
+                                       ensure_bucket_is_present,
+                                       load_crushmap,
+                                       check_output):
+        load_crushmap.return_value = ""
+        ensure_bucket_is_present.return_value = None
+        get_osd_weight.return_value = 1
+        reqs = json.dumps({'api-version': 1,
+                           'request-id': '1ef5aede',
+                           'ops': [{
+                               'op': 'move-osd-to-bucket',
+                               'osd': 'osd.0',
+                               'bucket': 'test'
+                           }]})
+        rc = ceph_broker.process_requests(reqs)
+        check_output.assert_called_with(["ceph",
+                                         '--id', 'admin',
+                                         "osd", "crush", "set",
+                                         u"osd.0", 1, "root=test"])
+
+        self.assertEqual(json.loads(rc)['exit-code'], 0)
+        self.assertEqual(json.loads(rc)['request-id'], '1ef5aede')
+
     @mock.patch('ceph_broker.log')
     def test_process_requests_invalid_api_rid(self, mock_log):
         reqs = json.dumps({'api-version': 0, 'request-id': '1ef5aede',

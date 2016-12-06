@@ -24,7 +24,11 @@ from charmhelpers.core.hookenv import (
     INFO,
     ERROR,
 )
-from ceph import get_cephfs
+from ceph import (
+    get_cephfs,
+    get_osd_weight
+)
+from ceph_helpers import Crushmap
 from charmhelpers.contrib.storage.linux.ceph import (
     create_erasure_profile,
     delete_pool,
@@ -360,6 +364,36 @@ def handle_rgw_zone_set(request, service):
     os.unlink(infile.name)
 
 
+def handle_put_osd_in_bucket(request, service):
+    osd_id = request.get('osd')
+    target_bucket = request.get('bucket')
+    if not osd_id or not target_bucket:
+        msg = "Missing OSD ID or Bucket"
+        log(msg, level=ERROR)
+        return {'exit-code': 1, 'stderr': msg}
+    crushmap = Crushmap()
+    try:
+        crushmap.ensure_bucket_is_present(target_bucket)
+        check_output(
+            [
+                'ceph',
+                '--id', service,
+                'osd',
+                'crush',
+                'set',
+                osd_id,
+                get_osd_weight(osd_id),
+                "root={}".format(target_bucket)
+            ]
+        )
+
+    except Exception as exc:
+        msg = "Failed to move OSD " \
+              "{} into Bucket {} :: {}".format(osd_id, target_bucket, exc)
+        log(msg, level=ERROR)
+        return {'exit-code': 1, 'stderr': msg}
+
+
 def handle_rgw_create_user(request, service):
     user_id = request.get('rgw-uid')
     display_name = request.get('display-name')
@@ -534,6 +568,8 @@ def process_requests_v1(reqs):
             ret = handle_rgw_regionmap_default(request=req, service=svc)
         elif op == "rgw-create-user":
             ret = handle_rgw_create_user(request=req, service=svc)
+        elif op == "move-osd-to-bucket":
+            ret = handle_put_osd_in_bucket(request=req, service=svc)
         else:
             msg = "Unknown operation '%s'" % op
             log(msg, level=ERROR)
