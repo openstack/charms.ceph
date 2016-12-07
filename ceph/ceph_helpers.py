@@ -194,7 +194,7 @@ class Crushmap(object):
             raise "Failed to read Crushmap"
 
     def ensure_bucket_is_present(self, bucket_name):
-        if bucket_name not in [bucket.name() for bucket in self.buckets()]:
+        if bucket_name not in [bucket.name for bucket in self.buckets()]:
             self.add_bucket(bucket_name)
             self.save()
 

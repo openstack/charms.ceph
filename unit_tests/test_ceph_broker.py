@@ -171,7 +171,7 @@ class CephBrokerTestCase(unittest.TestCase):
         check_output.assert_called_with(["ceph",
                                          '--id', 'admin',
                                          "osd", "crush", "set",
-                                         u"osd.0", 1, "root=test"])
+                                         u"osd.0", "1", "root=test"])
 
         self.assertEqual(json.loads(rc)['exit-code'], 0)
         self.assertEqual(json.loads(rc)['request-id'], '1ef5aede')

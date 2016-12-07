@@ -381,8 +381,8 @@ def handle_put_osd_in_bucket(request, service):
                 'osd',
                 'crush',
                 'set',
-                osd_id,
-                get_osd_weight(osd_id),
+                str(osd_id),
+                str(get_osd_weight(osd_id)),
                 "root={}".format(target_bucket)
             ]
         )
