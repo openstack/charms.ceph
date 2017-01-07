@@ -111,7 +111,8 @@ class UpgradeRollingTestCase(unittest.TestCase):
         ])
         chownr.assert_has_calls(
             [
-                call(group='ceph', owner='ceph', path='/var/lib/ceph')
+                call(group='ceph', owner='ceph', path='/var/lib/ceph',
+                     follow_links=True)
             ]
         )
 

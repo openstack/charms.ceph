@@ -1433,7 +1433,8 @@ def upgrade_monitor(new_version):
         # Ensure the ownership of Ceph's directories is correct
         chownr(path=os.path.join(os.sep, "var", "lib", "ceph"),
                owner=ceph_user(),
-               group=ceph_user())
+               group=ceph_user(),
+               follow_links=True)
         if systemd():
             for mon_id in get_local_mon_ids():
                 service_start('ceph-mon@{}'.format(mon_id))
@@ -1611,7 +1612,8 @@ def upgrade_osd(new_version):
         # Ensure the ownership of Ceph's directories is correct
         chownr(path=os.path.join(os.sep, "var", "lib", "ceph"),
                owner=ceph_user(),
-               group=ceph_user())
+               group=ceph_user(),
+               follow_links=True)
         if systemd():
             for osd_id in get_local_osd_ids():
                 service_start('ceph-osd@{}'.format(osd_id))
