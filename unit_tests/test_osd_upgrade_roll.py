@@ -71,16 +71,14 @@ class UpgradeRollingTestCase(unittest.TestCase):
     @patch('ceph.add_source')
     @patch('ceph.get_local_osd_ids')
     @patch('ceph.systemd')
-    @patch('ceph.ceph_user')
     @patch('ceph.get_version')
     @patch('ceph.config')
-    def test_upgrade_osd(self, config, get_version, ceph_user, systemd,
-                         local_osds, add_source, apt_update, status_set,
-                         log, service_start, service_stop, chownr,
-                         apt_install):
+    def test_upgrade_osd_hammer(self, config, get_version, systemd, local_osds,
+                                add_source, apt_update, status_set, log,
+                                service_start, service_stop, chownr,
+                                apt_install):
         config.side_effect = config_side_effect
-        get_version.return_value = "0.80"
-        ceph_user.return_value = "ceph"
+        get_version.side_effect = [0.80, 0.94]
         systemd.return_value = False
         local_osds.return_value = [0, 1, 2]
 
@@ -92,8 +90,45 @@ class UpgradeRollingTestCase(unittest.TestCase):
         ])
         log.assert_has_calls(
             [
-                call('Current ceph version is 0.80'),
+                call('Current ceph version is 0.8'),
                 call('Upgrading to: hammer')
+            ]
+        )
+        # Make sure on an Upgrade to Hammer that chownr was NOT called.
+        assert not chownr.called
+
+    @patch('ceph.apt_install')
+    @patch('ceph.chownr')
+    @patch('ceph.service_stop')
+    @patch('ceph.service_start')
+    @patch('ceph.log')
+    @patch('ceph.status_set')
+    @patch('ceph.apt_update')
+    @patch('ceph.add_source')
+    @patch('ceph.get_local_osd_ids')
+    @patch('ceph.systemd')
+    @patch('ceph.get_version')
+    @patch('ceph.config')
+    def test_upgrade_osd_jewel(self, config, get_version, systemd,
+                               local_osds, add_source, apt_update, status_set,
+                               log, service_start, service_stop, chownr,
+                               apt_install):
+        config.side_effect = config_side_effect
+        get_version.side_effect = [0.94, 10.1]
+        systemd.return_value = False
+        local_osds.return_value = [0, 1, 2]
+
+        ceph.upgrade_osd('jewel')
+        service_stop.assert_called_with('ceph-osd-all')
+        service_start.assert_called_with('ceph-osd-all')
+        status_set.assert_has_calls([
+            call('maintenance', 'Upgrading osd'),
+            call('maintenance', 'Updating file ownership for OSDs')
+        ])
+        log.assert_has_calls(
+            [
+                call('Current ceph version is 0.94'),
+                call('Upgrading to: jewel')
             ]
         )
         chownr.assert_has_calls(

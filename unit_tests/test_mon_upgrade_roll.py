@@ -82,16 +82,15 @@ class UpgradeRollingTestCase(unittest.TestCase):
     @patch('ceph.add_source')
     @patch('ceph.get_local_mon_ids')
     @patch('ceph.systemd')
-    @patch('ceph.ceph_user')
     @patch('ceph.get_version')
     @patch('ceph.config')
-    def test_upgrade_monitor(self, config, get_version, ceph_user, systemd,
-                             local_mons, add_source, apt_update, status_set,
-                             log, service_start, service_stop, chownr,
-                             apt_install):
-        get_version.return_value = "0.80"
+    def test_upgrade_monitor_hammer(self, config, get_version,
+                                    systemd, local_mons, add_source,
+                                    apt_update, status_set, log,
+                                    service_start, service_stop, chownr,
+                                    apt_install):
+        get_version.side_effect = [0.80, 0.94]
         config.side_effect = config_side_effect
-        ceph_user.return_value = "ceph"
         systemd.return_value = False
         local_mons.return_value = ['a']
 
@@ -102,8 +101,46 @@ class UpgradeRollingTestCase(unittest.TestCase):
 
         log.assert_has_calls(
             [
-                call('Current ceph version is 0.80'),
+                call('Current ceph version is 0.8'),
                 call('Upgrading to: hammer')
+            ]
+        )
+        status_set.assert_has_calls([
+            call('maintenance', 'Upgrading monitor'),
+        ])
+        assert not chownr.called
+
+    @patch('ceph.apt_install')
+    @patch('ceph.chownr')
+    @patch('ceph.service_stop')
+    @patch('ceph.service_start')
+    @patch('ceph.log')
+    @patch('ceph.status_set')
+    @patch('ceph.apt_update')
+    @patch('ceph.add_source')
+    @patch('ceph.get_local_mon_ids')
+    @patch('ceph.systemd')
+    @patch('ceph.get_version')
+    @patch('ceph.config')
+    def test_upgrade_monitor_jewel(self, config, get_version,
+                                   systemd, local_mons, add_source,
+                                   apt_update, status_set, log,
+                                   service_start, service_stop, chownr,
+                                   apt_install):
+        get_version.side_effect = [0.94, 10.1]
+        config.side_effect = config_side_effect
+        systemd.return_value = False
+        local_mons.return_value = ['a']
+
+        ceph.upgrade_monitor('jewel')
+        service_stop.assert_called_with('ceph-mon-all')
+        service_start.assert_called_with('ceph-mon-all')
+        add_source.assert_called_with('cloud:trusty-kilo', 'key')
+
+        log.assert_has_calls(
+            [
+                call('Current ceph version is 0.94'),
+                call('Upgrading to: jewel')
             ]
         )
         status_set.assert_has_calls([

@@ -1430,11 +1430,17 @@ def upgrade_monitor(new_version):
             service_stop('ceph-mon-all')
         apt_install(packages=PACKAGES, fatal=True)
 
-        # Ensure the ownership of Ceph's directories is correct
-        chownr(path=os.path.join(os.sep, "var", "lib", "ceph"),
-               owner=ceph_user(),
-               group=ceph_user(),
-               follow_links=True)
+        # Ensure the files and directories under /var/lib/ceph is chowned
+        # properly as part of the move to the Jewel release, which moved the
+        # ceph daemons to running as ceph:ceph instead of root:root.
+        if new_version == 'jewel':
+            # Ensure the ownership of Ceph's directories is correct
+            owner = ceph_user()
+            chownr(path=os.path.join(os.sep, "var", "lib", "ceph"),
+                   owner=owner,
+                   group=owner,
+                   follow_links=True)
+
         if systemd():
             for mon_id in get_local_mon_ids():
                 service_start('ceph-mon@{}'.format(mon_id))
@@ -1609,11 +1615,18 @@ def upgrade_osd(new_version):
             service_stop('ceph-osd-all')
         apt_install(packages=PACKAGES, fatal=True)
 
-        # Ensure the ownership of Ceph's directories is correct
-        chownr(path=os.path.join(os.sep, "var", "lib", "ceph"),
-               owner=ceph_user(),
-               group=ceph_user(),
-               follow_links=True)
+        # Ensure the files and directories under /var/lib/ceph is chowned
+        # properly as part of the move to the Jewel release, which moved the
+        # ceph daemons to running as ceph:ceph instead of root:root. Only do
+        # it when necessary as this is an expensive operation to run.
+        if new_version == 'jewel':
+            owner = ceph_user()
+            status_set('maintenance', 'Updating file ownership for OSDs')
+            chownr(path=os.path.join(os.sep, "var", "lib", "ceph"),
+                   owner=owner,
+                   group=owner,
+                   follow_links=True)
+
         if systemd():
             for osd_id in get_local_osd_ids():
                 service_start('ceph-osd@{}'.format(osd_id))
