@@ -421,6 +421,7 @@ def tune_dev(block_dev):
     if uuid is None:
         log('block device {} uuid is None.  Unable to save to '
             'hdparm.conf'.format(block_dev), level=DEBUG)
+        return
     save_settings_dict = {}
     log('Tuning device {}'.format(block_dev))
     status_set('maintenance', 'Tuning device {}'.format(block_dev))
