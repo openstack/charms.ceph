@@ -15,9 +15,11 @@
 import mock
 import unittest
 import ceph
+from subprocess import CalledProcessError
 
 
 class TestDevice():
+
     """Test class to mock out pyudev Device"""
 
     def __getitem__(**kwargs):
@@ -34,6 +36,7 @@ class TestDevice():
 
 
 class CephTestCase(unittest.TestCase):
+
     def setUp(self):
         super(CephTestCase, self).setUp()
 
@@ -110,32 +113,45 @@ class CephTestCase(unittest.TestCase):
                     as subprocess:
                 with mock.patch.object(ceph.socket, "gethostname",
                                        return_value="osd001"):
+                    subprocess.side_effect = [
+                        CalledProcessError(0, 0, 0), ""]
                     ceph.get_named_key(name="rgw001",
                                        pool_list=["rbd", "block"])
-                    subprocess.assert_called_with(
-                        ['sudo', '-u', 'ceph', 'ceph', '--name', 'mon.',
-                         '--keyring',
-                         '/var/lib/ceph/mon/ceph-osd001/keyring',
-                         'auth',
-                         'get-or-create', 'client.rgw001', 'mon', 'allow r',
-                         'osd',
-                         'allow rwx pool=rbd pool=block'])
+                    subprocess.assert_has_calls([
+                        mock.call(['sudo', '-u', 'ceph', 'ceph', '--name',
+                                   'mon.', '--keyring',
+                                   '/var/lib/ceph/mon/ceph-osd001/keyring',
+                                   'auth', 'get', 'client.rgw001']),
+                        mock.call(['sudo', '-u', 'ceph', 'ceph', '--name',
+                                   'mon.', '--keyring',
+                                   '/var/lib/ceph/mon/ceph-osd001/keyring',
+                                   'auth', 'get-or-create', 'client.rgw001',
+                                   'mon', 'allow r', 'osd',
+                                   'allow rwx pool=rbd pool=block'])])
 
     def test_get_named_key(self):
         with mock.patch.object(ceph, "ceph_user", return_value="ceph"):
             with mock.patch.object(ceph.subprocess, "check_output") \
                     as subprocess:
+                subprocess.side_effect = [
+                    CalledProcessError(0, 0, 0),
+                    ""]
                 with mock.patch.object(ceph.socket, "gethostname",
                                        return_value="osd001"):
                     ceph.get_named_key(name="rgw001")
-                    subprocess.assert_called_with(
-                        ['sudo', '-u', 'ceph', 'ceph', '--name', 'mon.',
-                         '--keyring',
-                         '/var/lib/ceph/mon/ceph-osd001/keyring',
-                         'auth',
-                         'get-or-create', 'client.rgw001', 'mon', 'allow r',
-                         'osd',
-                         'allow rwx'])
+                    for call in subprocess.mock_calls:
+                        print("Subprocess: {}".format(call))
+                    subprocess.assert_has_calls([
+                        mock.call(['sudo', '-u', 'ceph', 'ceph', '--name',
+                                   'mon.', '--keyring',
+                                   '/var/lib/ceph/mon/ceph-osd001/keyring',
+                                   'auth', 'get', 'client.rgw001']),
+                        mock.call(['sudo', '-u', 'ceph', 'ceph', '--name',
+                                   'mon.', '--keyring',
+                                   '/var/lib/ceph/mon/ceph-osd001/keyring',
+                                   'auth', 'get-or-create', 'client.rgw001',
+                                   'mon', 'allow r', 'osd',
+                                   'allow rwx'])])
 
     def test_list_unmounted_devices(self):
         dev1 = mock.MagicMock(spec=TestDevice)
@@ -151,16 +167,16 @@ class CephTestCase(unittest.TestCase):
         with mock.patch(
             'pyudev.Context.list_devices',
                 return_value=devices):
-                with mock.patch.object(ceph,
-                                       'is_device_mounted',
-                                       return_value=False):
-                    devices = ceph.unmounted_disks()
-                    self.assertEqual(devices, ['/dev/sda', '/dev/sdb'])
-                with mock.patch.object(ceph,
-                                       'is_device_mounted',
-                                       return_value=True):
-                    devices = ceph.unmounted_disks()
-                    self.assertEqual(devices, [])
+            with mock.patch.object(ceph,
+                                   'is_device_mounted',
+                                   return_value=False):
+                devices = ceph.unmounted_disks()
+                self.assertEqual(devices, ['/dev/sda', '/dev/sdb'])
+            with mock.patch.object(ceph,
+                                   'is_device_mounted',
+                                   return_value=True):
+                devices = ceph.unmounted_disks()
+                self.assertEqual(devices, [])
 
 
 class CephVersionTestCase(unittest.TestCase):
