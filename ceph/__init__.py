@@ -1092,6 +1092,26 @@ def get_named_key(name, caps=None, pool_list=None):
     :param caps:  dict of cephx capabilities
     :return: Returns a cephx key
     """
+    try:
+        # Does the key already exist?
+        output = subprocess.check_output(
+            [
+                'sudo',
+                '-u', ceph_user(),
+                'ceph',
+                '--name', 'mon.',
+                '--keyring',
+                '/var/lib/ceph/mon/ceph-{}/keyring'.format(
+                    socket.gethostname()
+                ),
+                'auth',
+                'get',
+                'client.{}'.format(name),
+            ]).strip()
+        return parse_key(output)
+    except subprocess.CalledProcessError:
+        # Couldn't get the key, time to create it!
+        log("Creating new key for {}".format(name), level=DEBUG)
     caps = caps or _default_caps
     cmd = [
         "sudo",
