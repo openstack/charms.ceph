@@ -186,7 +186,8 @@ def handle_add_permissions_to_key(request, service):
     if group_name not in service_obj['group_names'][permission]:
         service_obj['group_names'][permission].append(group_name)
     save_service(service=service_obj, service_name=service_name)
-    service_obj['groups'][group_name] = group
+    service_obj['groups'] = _build_service_groups(service_obj,
+                                                  group_namespace)
     update_service_permissions(service_name, service_obj, group_namespace)
 
 
@@ -245,7 +246,7 @@ def get_service_groups(service, namespace=None):
     {
         group_names: {'rwx': ['images']},
         groups: {
-    1        'images': {
+            'images': {
                 pools: ['glance'],
                 services: ['nova']
             }
@@ -261,15 +262,37 @@ def get_service_groups(service, namespace=None):
     except ValueError:
         service = None
     if service:
-        for permission, groups in service['group_names'].items():
-            for group in groups:
-                name = group
-                if namespace:
-                    name = "{}-{}".format(namespace, name)
-                service['groups'][group] = get_group(group_name=name)
+        service['groups'] = _build_service_groups(service, namespace)
     else:
         service = {'group_names': {}, 'groups': {}}
     return service
+
+
+def _build_service_groups(service, namespace=None):
+    '''Rebuild the 'groups' dict for a service group
+
+    :returns: dict: dictionary keyed by group name of the following
+                    format:
+
+                    {
+                        'images': {
+                            pools: ['glance'],
+                            services: ['nova', 'glance]
+                         },
+                         'vms':{
+                            pools: ['nova'],
+                            services: ['nova']
+                         }
+                    }
+    '''
+    all_groups = {}
+    for _, groups in service['group_names'].items():
+        for group in groups:
+            name = group
+            if namespace:
+                name = "{}-{}".format(namespace, name)
+            all_groups[group] = get_group(group_name=name)
+    return all_groups
 
 
 def get_group(group_name):
