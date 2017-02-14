@@ -218,7 +218,7 @@ def add_pool_to_group(pool, group, namespace=None):
 
 def pool_permission_list_for_service(service):
     """Build the permission string for Ceph for a given service"""
-    permissions = ""
+    permissions = []
     permission_types = {}
     for permission, group in service["group_names"].items():
         if permission not in permission_types:
@@ -226,12 +226,11 @@ def pool_permission_list_for_service(service):
         for item in group:
             permission_types[permission].append(item)
     for permission, groups in permission_types.items():
-        permission = " allow {}".format(permission)
+        permission = "allow {}".format(permission)
         for group in groups:
             for pool in service['groups'][group]['pools']:
-                permission = "{} pool={}".format(permission, pool)
-        permissions += permission
-    return ["mon", "allow r", "osd", permissions.strip()]
+                permissions.append("{} pool={}".format(permission, pool))
+    return ["mon", "allow r", "osd", ', '.join(permissions)]
 
 
 def get_service_groups(service, namespace=None):

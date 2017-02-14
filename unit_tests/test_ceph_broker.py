@@ -64,9 +64,10 @@ class CephBrokerTestCase(unittest.TestCase):
             service='admin',
             value=json.dumps({"pools": ["glance", "cinder"],
                               "services": ["nova"]}))
-        _check_call.assert_called_with(['ceph', 'auth', 'caps',
-                                        'client.nova', 'mon', 'allow r', 'osd',
-                                        'allow rwx pool=glance pool=cinder'])
+        _check_call.assert_called_with([
+            'ceph', 'auth', 'caps',
+            'client.nova', 'mon', 'allow r', 'osd',
+            'allow rwx pool=glance, allow rwx pool=cinder'])
 
     @mock.patch('ceph_broker.monitor_key_set')
     @mock.patch('ceph_broker.monitor_key_get')
