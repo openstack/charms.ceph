@@ -208,7 +208,8 @@ def add_pool_to_group(pool, group, namespace=None):
     if namespace:
         group_name = "{}-{}".format(namespace, group_name)
     group = get_group(group_name=group_name)
-    group["pools"].append(pool)
+    if pool not in group['pools']:
+        group["pools"].append(pool)
     save_group(group, group_name=group_name)
     for service in group['services']:
         update_service_permissions(service, namespace=namespace)
