@@ -960,7 +960,7 @@ def parse_key(raw_key):
     else:
         for element in raw_key.splitlines():
             if 'key' in element:
-                key = element.split(' = ')[1].strip()  # IGNORE:E1103
+                return element.split(' = ')[1].strip()  # IGNORE:E1103
     return key
 
 

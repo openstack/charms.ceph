@@ -19,7 +19,6 @@ from subprocess import CalledProcessError
 
 
 class TestDevice():
-
     """Test class to mock out pyudev Device"""
 
     def __getitem__(**kwargs):
@@ -36,7 +35,6 @@ class TestDevice():
 
 
 class CephTestCase(unittest.TestCase):
-
     def setUp(self):
         super(CephTestCase, self).setUp()
 
@@ -153,6 +151,23 @@ class CephTestCase(unittest.TestCase):
                                    'mon', 'allow r', 'osd',
                                    'allow rwx'])])
 
+    def test_parse_key_with_caps_existing_key(self):
+        expected = "AQCm7aVYQFXXFhAAj0WIeqcag88DKOvY4UKR/g=="
+        with_caps = "[client.osd-upgrade]\n"\
+            "	key = AQCm7aVYQFXXFhAAj0WIeqcag88DKOvY4UKR/g==\n"\
+            "	caps mon = \"allow command \"config-key\";"
+        key = ceph.parse_key(with_caps)
+        print("key: {}".format(key))
+        self.assertEqual(key, expected)
+
+    def test_parse_key_without_caps(self):
+        expected = "AQCm7aVYQFXXFhAAj0WIeqcag88DKOvY4UKR/g=="
+        without_caps = "[client.osd-upgrade]\n"\
+            "	key = AQCm7aVYQFXXFhAAj0WIeqcag88DKOvY4UKR/g=="
+        key = ceph.parse_key(without_caps)
+        print("key: {}".format(key))
+        self.assertEqual(key, expected)
+
     def test_list_unmounted_devices(self):
         dev1 = mock.MagicMock(spec=TestDevice)
         dev1.__getitem__.return_value = "block"
@@ -165,7 +180,7 @@ class CephTestCase(unittest.TestCase):
         dev3.device_node = '/dev/loop1'
         devices = [dev1, dev2, dev3]
         with mock.patch(
-            'pyudev.Context.list_devices',
+                'pyudev.Context.list_devices',
                 return_value=devices):
             with mock.patch.object(ceph,
                                    'is_device_mounted',
@@ -180,7 +195,6 @@ class CephTestCase(unittest.TestCase):
 
 
 class CephVersionTestCase(unittest.TestCase):
-
     @mock.patch.object(ceph, 'get_os_codename_install_source')
     def test_resolve_ceph_version_trusty(self, get_os_codename_install_source):
         get_os_codename_install_source.return_value = 'juno'
