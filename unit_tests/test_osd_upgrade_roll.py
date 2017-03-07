@@ -13,9 +13,11 @@
 # limitations under the License.
 
 import time
+import os
 import unittest
+import sys
 
-from mock import patch, call
+from mock import patch, call, mock_open
 
 import ceph
 from ceph import CrushLocation
@@ -61,10 +63,10 @@ def monitor_key_side_effect(*args):
 
 
 class UpgradeRollingTestCase(unittest.TestCase):
+    @patch('ceph.dirs_need_ownership_update')
     @patch('ceph.apt_install')
     @patch('ceph.chownr')
-    @patch('ceph.service_stop')
-    @patch('ceph.service_start')
+    @patch('ceph.service_restart')
     @patch('ceph.log')
     @patch('ceph.status_set')
     @patch('ceph.apt_update')
@@ -75,16 +77,16 @@ class UpgradeRollingTestCase(unittest.TestCase):
     @patch('ceph.config')
     def test_upgrade_osd_hammer(self, config, get_version, systemd, local_osds,
                                 add_source, apt_update, status_set, log,
-                                service_start, service_stop, chownr,
-                                apt_install):
+                                service_restart, chownr, apt_install,
+                                dirs_need_ownership_update):
         config.side_effect = config_side_effect
         get_version.side_effect = [0.80, 0.94]
         systemd.return_value = False
         local_osds.return_value = [0, 1, 2]
+        dirs_need_ownership_update.return_value = False
 
         ceph.upgrade_osd('hammer')
-        service_stop.assert_called_with('ceph-osd-all')
-        service_start.assert_called_with('ceph-osd-all')
+        service_restart.assert_called_with('ceph-osd-all')
         status_set.assert_has_calls([
             call('maintenance', 'Upgrading osd'),
         ])
@@ -97,10 +99,12 @@ class UpgradeRollingTestCase(unittest.TestCase):
         # Make sure on an Upgrade to Hammer that chownr was NOT called.
         assert not chownr.called
 
+    @patch('ceph._upgrade_single_osd')
+    @patch('ceph.update_owner')
+    @patch('os.listdir')
+    @patch('ceph._get_child_dirs')
+    @patch('ceph.dirs_need_ownership_update')
     @patch('ceph.apt_install')
-    @patch('ceph.chownr')
-    @patch('ceph.service_stop')
-    @patch('ceph.service_start')
     @patch('ceph.log')
     @patch('ceph.status_set')
     @patch('ceph.apt_update')
@@ -111,19 +115,31 @@ class UpgradeRollingTestCase(unittest.TestCase):
     @patch('ceph.config')
     def test_upgrade_osd_jewel(self, config, get_version, systemd,
                                local_osds, add_source, apt_update, status_set,
-                               log, service_start, service_stop, chownr,
-                               apt_install):
+                               log, apt_install, dirs_need_ownership_update,
+                               _get_child_dirs, listdir, update_owner,
+                               _upgrade_single_osd):
         config.side_effect = config_side_effect
         get_version.side_effect = [0.94, 10.1]
         systemd.return_value = False
         local_osds.return_value = [0, 1, 2]
+        listdir.return_value = ['osd', 'mon', 'fs']
+        _get_child_dirs.return_value = ['ceph-0', 'ceph-1', 'ceph-2']
+        dirs_need_ownership_update.return_value = True
 
         ceph.upgrade_osd('jewel')
-        service_stop.assert_called_with('ceph-osd-all')
-        service_start.assert_called_with('ceph-osd-all')
+        update_owner.assert_has_calls([
+            call(ceph.CEPH_BASE_DIR, recurse_dirs=False),
+            call(os.path.join(ceph.CEPH_BASE_DIR, 'mon')),
+            call(os.path.join(ceph.CEPH_BASE_DIR, 'fs')),
+        ])
+        _upgrade_single_osd.assert_has_calls([
+            call('0', 'ceph-0'),
+            call('1', 'ceph-1'),
+            call('2', 'ceph-2'),
+        ])
         status_set.assert_has_calls([
             call('maintenance', 'Upgrading osd'),
-            call('maintenance', 'Updating file ownership for OSDs')
+            call('maintenance', 'Upgrading packages to jewel')
         ])
         log.assert_has_calls(
             [
@@ -131,12 +147,76 @@ class UpgradeRollingTestCase(unittest.TestCase):
                 call('Upgrading to: jewel')
             ]
         )
-        chownr.assert_has_calls(
-            [
-                call(group='ceph', owner='ceph', path='/var/lib/ceph',
-                     follow_links=True)
-            ]
-        )
+
+    @patch.object(ceph, 'stop_osd')
+    @patch.object(ceph, 'disable_osd')
+    @patch.object(ceph, 'update_owner')
+    @patch.object(ceph, 'enable_osd')
+    @patch.object(ceph, 'start_osd')
+    def test_upgrade_single_osd(self, start_osd, enable_osd, update_owner,
+                                disable_osd, stop_osd):
+        ceph._upgrade_single_osd(1, 'ceph-1')
+        stop_osd.assert_called_with(1)
+        disable_osd.assert_called_with(1)
+        update_owner.assert_called_with('/var/lib/ceph/osd/ceph-1')
+        enable_osd.assert_called_with(1)
+        start_osd.assert_called_with(1)
+
+    @patch.object(ceph, 'systemd')
+    @patch.object(ceph, 'service_stop')
+    def test_stop_osd(self, service_stop, systemd):
+        systemd.return_value = False
+        ceph.stop_osd(1)
+        service_stop.assert_called_with('ceph-osd', id=1)
+
+        systemd.return_value = True
+        ceph.stop_osd(2)
+        service_stop.assert_called_with('ceph-osd@2')
+
+    @patch.object(ceph, 'systemd')
+    @patch.object(ceph, 'service_start')
+    def test_start_osd(self, service_start, systemd):
+        systemd.return_value = False
+        ceph.start_osd(1)
+        service_start.assert_called_with('ceph-osd', id=1)
+
+        systemd.return_value = True
+        ceph.start_osd(2)
+        service_start.assert_called_with('ceph-osd@2')
+
+    @patch('subprocess.check_call')
+    @patch('os.path.exists')
+    @patch('os.unlink')
+    @patch('ceph.systemd')
+    def test_disable_osd(self, systemd, unlink, exists, check_call):
+        systemd.return_value = True
+        ceph.disable_osd(4)
+        check_call.assert_called_with(['systemctl', 'disable', 'ceph-osd@4'])
+
+        exists.return_value = True
+        systemd.return_value = False
+        ceph.disable_osd(3)
+        unlink.assert_called_with('/var/lib/ceph/osd/ceph-3/ready')
+
+    @patch('subprocess.check_call')
+    @patch('ceph.update_owner')
+    @patch('ceph.systemd')
+    def test_enable_osd(self, systemd, update_owner, check_call):
+        systemd.return_value = True
+        ceph.enable_osd(5)
+        check_call.assert_called_with(['systemctl', 'enable', 'ceph-osd@5'])
+
+        systemd.return_value = False
+        mo = mock_open()
+        # Detect which builtin open version we need to mock based on
+        # the python version.
+        bs = 'builtins' if sys.version_info > (3, 0) else '__builtin__'
+        with patch('%s.open' % bs, mo):
+            ceph.enable_osd(6)
+        mo.assert_called_once_with('/var/lib/ceph/osd/ceph-6/ready', 'w')
+        handle = mo()
+        handle.write.assert_called_with('ready')
+        update_owner.assert_called_with('/var/lib/ceph/osd/ceph-6/ready')
 
     @patch('ceph.socket')
     @patch('ceph.get_osd_tree')
