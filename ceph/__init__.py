@@ -28,6 +28,7 @@ import pyudev
 from datetime import datetime
 
 from charmhelpers.core import hookenv
+from charmhelpers.core import templating
 from charmhelpers.core.host import (
     chownr,
     cmp_pkgrevno,
@@ -46,7 +47,6 @@ from charmhelpers.core.hookenv import (
     DEBUG,
     ERROR,
     WARNING)
-from charmhelpers.core.services import render_template
 from charmhelpers.fetch import (
     apt_cache,
     add_source, apt_install, apt_update)
@@ -64,6 +64,7 @@ from charmhelpers.contrib.openstack.utils import (
 
 CEPH_BASE_DIR = os.path.join(os.sep, 'var', 'lib', 'ceph')
 OSD_BASE_DIR = os.path.join(CEPH_BASE_DIR, 'osd')
+HDPARM_FILE = os.path.join(os.sep, 'etc', 'hdparm.conf')
 
 LEADER = 'leader'
 PEON = 'peon'
@@ -229,14 +230,21 @@ def persist_settings(settings_dict):
         The settings_dict should be in the form of {"uuid": {"key":"value"}}
         :param settings_dict: dict of settings to save
     """
-    hdparm_path = os.path.join(os.sep, 'etc', 'hdparm.conf')
+    if not settings_dict:
+        return
+
     try:
-        with open(hdparm_path, 'w') as hdparm:
-            hdparm.write(render_template('hdparm.conf', settings_dict))
+        templating.render(source='hdparm.conf', target=HDPARM_FILE,
+                          context=settings_dict)
     except IOError as err:
         log("Unable to open {path} because of error: {error}".format(
-            path=hdparm_path,
-            error=err.message), level=ERROR)
+            path=HDPARM_FILE, error=err.message), level=ERROR)
+    except Exception as e:
+        # The templating.render can raise a jinja2 exception if the
+        # template is not found. Rather than polluting the import
+        # space of this charm, simply catch Exception
+        log('Unable to render {path} due to error: {error}'.format(
+            path=HDPARM_FILE, error=e.message), level=ERROR)
 
 
 def set_max_sectors_kb(dev_name, max_sectors_size):
