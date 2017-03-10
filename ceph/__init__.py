@@ -62,6 +62,8 @@ from charmhelpers.contrib.storage.linux.utils import (
 from charmhelpers.contrib.openstack.utils import (
     get_os_codename_install_source)
 
+from ceph.ceph_helpers import check_output
+
 CEPH_BASE_DIR = os.path.join(os.sep, 'var', 'lib', 'ceph')
 OSD_BASE_DIR = os.path.join(CEPH_BASE_DIR, 'osd')
 HDPARM_FILE = os.path.join(os.sep, 'etc', 'hdparm.conf')
@@ -179,7 +181,7 @@ def tune_nic(network_interface):
         try:
             # Apply the settings
             log("Applying sysctl settings", level=DEBUG)
-            subprocess.check_output(["sysctl", "-p", sysctl_file])
+            check_output(["sysctl", "-p", sysctl_file])
         except subprocess.CalledProcessError as err:
             log('sysctl -p {} failed with error {}'.format(sysctl_file,
                                                            err.output),
@@ -318,9 +320,9 @@ def set_hdd_read_ahead(dev_name, read_ahead_sectors=256):
         log('Setting read ahead to {} for device {}'.format(
             read_ahead_sectors,
             dev_name))
-        subprocess.check_output(['hdparm',
-                                 '-a{}'.format(read_ahead_sectors),
-                                 dev_name])
+        check_output(['hdparm',
+                      '-a{}'.format(read_ahead_sectors),
+                      dev_name])
     except subprocess.CalledProcessError as e:
         log('hdparm failed with error: {}'.format(e.output),
             level=ERROR)
@@ -333,7 +335,7 @@ def get_block_uuid(block_dev):
     :return: The UUID of the device or None on Error.
     """
     try:
-        block_info = subprocess.check_output(
+        block_info = check_output(
             ['blkid', '-o', 'export', block_dev])
         for tag in block_info.split('\n'):
             parts = tag.split('=')
@@ -482,7 +484,7 @@ def get_osd_weight(osd_id):
       Also raises CalledProcessError if our ceph command fails
     """
     try:
-        tree = subprocess.check_output(
+        tree = check_output(
             ['ceph', 'osd', 'tree', '--format=json'])
         try:
             json_tree = json.loads(tree)
@@ -509,7 +511,7 @@ def get_osd_tree(service):
       Also raises CalledProcessError if our ceph command fails
     """
     try:
-        tree = subprocess.check_output(
+        tree = check_output(
             ['ceph', '--id', service,
              'osd', 'tree', '--format=json'])
         try:
@@ -685,7 +687,7 @@ def is_quorum():
     ]
     if os.path.exists(asok):
         try:
-            result = json.loads(subprocess.check_output(cmd))
+            result = json.loads(check_output(cmd))
         except subprocess.CalledProcessError:
             return False
         except ValueError:
@@ -712,7 +714,7 @@ def is_leader():
     ]
     if os.path.exists(asok):
         try:
-            result = json.loads(subprocess.check_output(cmd))
+            result = json.loads(check_output(cmd))
         except subprocess.CalledProcessError:
             return False
         except ValueError:
@@ -819,7 +821,7 @@ def replace_osd(dead_osd_number,
         # Drop this osd out of the cluster. This will begin a
         # rebalance operation
         status_set('maintenance', 'Removing osd {}'.format(dead_osd_number))
-        subprocess.check_output([
+        check_output([
             'ceph',
             '--id',
             'osd-upgrade',
@@ -830,8 +832,8 @@ def replace_osd(dead_osd_number,
         if systemd():
             service_stop('ceph-osd@{}'.format(dead_osd_number))
         else:
-            subprocess.check_output(['stop', 'ceph-osd', 'id={}'.format(
-                dead_osd_number)]),
+            check_output(['stop', 'ceph-osd', 'id={}'.format(
+                dead_osd_number)])
         # umount if still mounted
         ret = umount(mount_point)
         if ret < 0:
@@ -839,20 +841,20 @@ def replace_osd(dead_osd_number,
                 mount_point, os.strerror(ret)))
         # Clean up the old mount point
         shutil.rmtree(mount_point)
-        subprocess.check_output([
+        check_output([
             'ceph',
             '--id',
             'osd-upgrade',
             'osd', 'crush', 'remove',
             'osd.{}'.format(dead_osd_number)])
         # Revoke the OSDs access keys
-        subprocess.check_output([
+        check_output([
             'ceph',
             '--id',
             'osd-upgrade',
             'auth', 'del',
             'osd.{}'.format(dead_osd_number)])
-        subprocess.check_output([
+        check_output([
             'ceph',
             '--id',
             'osd-upgrade',
@@ -871,7 +873,7 @@ def replace_osd(dead_osd_number,
 
 def is_osd_disk(dev):
     try:
-        info = subprocess.check_output(['sgdisk', '-i', '1', dev])
+        info = check_output(['sgdisk', '-i', '1', dev])
         info = info.split("\n")  # IGNORE:E1103
         for line in info:
             for ptype in CEPH_PARTITIONS:
@@ -952,7 +954,7 @@ def generate_monitor_secret():
         '--name=mon.',
         '--gen-key'
     ]
-    res = subprocess.check_output(cmd)
+    res = check_output(cmd)
 
     return "{}==".format(res.split('=')[1].strip())
 
@@ -1100,8 +1102,8 @@ def create_named_keyring(entity, name, caps=None):
     ]
     for subsystem, subcaps in caps.items():
         cmd.extend([subsystem, '; '.join(subcaps)])
-    log("Calling subprocess.check_output: {}".format(cmd), level=DEBUG)
-    return parse_key(subprocess.check_output(cmd).strip())  # IGNORE:E1103
+    log("Calling check_output: {}".format(cmd), level=DEBUG)
+    return parse_key(check_output(cmd).strip())  # IGNORE:E1103
 
 
 def get_upgrade_key():
@@ -1118,7 +1120,7 @@ def get_named_key(name, caps=None, pool_list=None):
     """
     try:
         # Does the key already exist?
-        output = subprocess.check_output(
+        output = check_output(
             [
                 'sudo',
                 '-u', ceph_user(),
@@ -1158,8 +1160,8 @@ def get_named_key(name, caps=None, pool_list=None):
                 pools = " ".join(['pool={0}'.format(i) for i in pool_list])
                 subcaps[0] = subcaps[0] + " " + pools
         cmd.extend([subsystem, '; '.join(subcaps)])
-    log("Calling subprocess.check_output: {}".format(cmd), level=DEBUG)
-    return parse_key(subprocess.check_output(cmd).strip())  # IGNORE:E1103
+    log("Calling check_output: {}".format(cmd), level=DEBUG)
+    return parse_key(check_output(cmd).strip())  # IGNORE:E1103
 
 
 def upgrade_key_caps(key, caps):
@@ -1251,7 +1253,7 @@ def maybe_zap_journal(journal_dev):
 def get_partitions(dev):
     cmd = ['partx', '--raw', '--noheadings', dev]
     try:
-        out = subprocess.check_output(cmd).splitlines()
+        out = check_output(cmd).splitlines()
         log("get partitions: {}".format(out), level=DEBUG)
         return out
     except subprocess.CalledProcessError as e:
@@ -1361,7 +1363,7 @@ def get_running_osds():
     """Returns a list of the pids of the current running OSD daemons"""
     cmd = ['pgrep', 'ceph-osd']
     try:
-        result = subprocess.check_output(cmd)
+        result = check_output(cmd)
         return result.split()
     except subprocess.CalledProcessError:
         return []
@@ -1377,9 +1379,9 @@ def get_cephfs(service):
         # This command wasn't introduced until 0.86 ceph
         return []
     try:
-        output = subprocess.check_output(["ceph",
-                                          '--id', service,
-                                          "fs", "ls"])
+        output = check_output(["ceph",
+                               '--id', service,
+                               "fs", "ls"])
         if not output:
             return []
         """
@@ -1881,7 +1883,7 @@ def list_pools(service):
     """
     try:
         pool_list = []
-        pools = subprocess.check_output(['rados', '--id', service, 'lspools'])
+        pools = check_output(['rados', '--id', service, 'lspools'])
         for pool in pools.splitlines():
             pool_list.append(pool)
         return pool_list

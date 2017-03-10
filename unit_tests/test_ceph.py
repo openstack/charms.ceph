@@ -38,7 +38,7 @@ class CephTestCase(unittest.TestCase):
     def setUp(self):
         super(CephTestCase, self).setUp()
 
-    @mock.patch('subprocess.check_output')
+    @mock.patch.object(ceph, 'check_output')
     def test_get_osd_weight(self, output):
         """It gives an OSD's weight"""
         output.return_value = """{
@@ -107,7 +107,7 @@ class CephTestCase(unittest.TestCase):
 
     def test_get_named_key_with_pool(self):
         with mock.patch.object(ceph, "ceph_user", return_value="ceph"):
-            with mock.patch.object(ceph.subprocess, "check_output") \
+            with mock.patch.object(ceph, "check_output") \
                     as subprocess:
                 with mock.patch.object(ceph.socket, "gethostname",
                                        return_value="osd001"):
@@ -129,7 +129,7 @@ class CephTestCase(unittest.TestCase):
 
     def test_get_named_key(self):
         with mock.patch.object(ceph, "ceph_user", return_value="ceph"):
-            with mock.patch.object(ceph.subprocess, "check_output") \
+            with mock.patch.object(ceph, "check_output") \
                     as subprocess:
                 subprocess.side_effect = [
                     CalledProcessError(0, 0, 0),

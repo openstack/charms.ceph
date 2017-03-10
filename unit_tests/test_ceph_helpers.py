@@ -19,19 +19,19 @@ if not six.PY3:
 else:
     builtin_open = 'builtins.open'
 
-LS_POOLS = b"""
+LS_POOLS = """
 images
 volumes
 rbd
 """
 
-LS_RBDS = b"""
+LS_RBDS = """
 rbd1
 rbd2
 rbd3
 """
 
-IMG_MAP = b"""
+IMG_MAP = """
 bar
 baz
 """
@@ -408,7 +408,7 @@ class CephUtilsTests(unittest.TestCase):
     @patch.object(ceph_utils, 'ceph_version')
     def test_get_osds(self, version):
         version.return_value = '0.56.2'
-        self.check_output.return_value = json.dumps([1, 2, 3]).encode('UTF-8')
+        self.check_output.return_value = json.dumps([1, 2, 3])
         self.assertEquals(ceph_utils.get_osds('test'), [1, 2, 3])
 
     @patch.object(ceph_utils, 'ceph_version')
@@ -419,7 +419,7 @@ class CephUtilsTests(unittest.TestCase):
     @patch.object(ceph_utils, 'ceph_version')
     def test_get_osds_none(self, version):
         version.return_value = '0.56.2'
-        self.check_output.return_value = json.dumps(None).encode('UTF-8')
+        self.check_output.return_value = json.dumps(None)
         self.assertEquals(ceph_utils.get_osds('test'), None)
 
     @patch.object(ceph_utils, 'get_osds')
@@ -917,7 +917,7 @@ class CephUtilsTests(unittest.TestCase):
     def test_ceph_version_ok(self, path, output):
         path.return_value = True
         output.return_value = \
-            b'ceph version 0.67.4 (ad85b8bfafea6232d64cb7ba76a8b6e8252fa0c7)'
+            'ceph version 0.67.4 (ad85b8bfafea6232d64cb7ba76a8b6e8252fa0c7)'
         self.assertEquals(ceph_utils.ceph_version(), '0.67.4')
 
     @patch.object(ceph_utils.Pool, 'get_pgs')

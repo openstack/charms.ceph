@@ -36,7 +36,11 @@ import uuid
 import re
 
 import subprocess
-from subprocess import (check_call, check_output, CalledProcessError, )
+from subprocess import (
+    check_call,
+    check_output as s_check_output,
+    CalledProcessError,
+)
 from charmhelpers.core.hookenv import (config,
                                        local_unit,
                                        relation_get,
@@ -109,6 +113,15 @@ CRUSHMAP_ID_RE = re.compile(r"id\s+(-?\d+)")
 DEFAULT_PGS_PER_OSD_TARGET = 100
 DEFAULT_POOL_WEIGHT = 10.0
 LEGACY_PG_COUNT = 200
+
+
+def check_output(*args, **kwargs):
+    '''
+    Helper wrapper for py2/3 compat with subprocess.check_output
+
+    @returns str: UTF-8 decoded representation of output
+    '''
+    return s_check_output(*args, **kwargs).decode('UTF-8')
 
 
 def validator(value, valid_type, valid_range=None):
@@ -188,7 +201,7 @@ class Crushmap(object):
                 stdout=subprocess.PIPE)
             return subprocess.check_output(
                 ('crushtool', '-d', '-'),
-                stdin=crush.stdout).decode('utf-8')
+                stdin=crush.stdout)
         except Exception as e:
             log("load_crushmap error: {}".format(e))
             raise "Failed to read Crushmap"
@@ -565,7 +578,8 @@ def monitor_key_delete(service, key):
     :param key: six.string_types.  The key to delete.
     """
     try:
-        check_output(['ceph', '--id', service, 'config-key', 'del', str(key)])
+        check_output(['ceph', '--id', service,
+                      'config-key', 'del', str(key)])
     except CalledProcessError as e:
         log("Monitor config-key put failed with message: {}".format(e.output))
         raise
@@ -867,8 +881,7 @@ def get_cache_mode(service, pool_name):
 def pool_exists(service, name):
     """Check to see if a RADOS pool already exists."""
     try:
-        out = check_output(['rados', '--id', service, 'lspools']).decode(
-            'UTF-8')
+        out = check_output(['rados', '--id', service, 'lspools'])
     except CalledProcessError:
         return False
 
@@ -882,7 +895,7 @@ def get_osds(service):
     version = ceph_version()
     if version and version >= '0.56':
         return json.loads(check_output(['ceph', '--id', service, 'osd', 'ls',
-                                        '--format=json']).decode('UTF-8'))
+                                        '--format=json']))
 
     return None
 
@@ -900,7 +913,7 @@ def rbd_exists(service, pool, rbd_img):
     """Check to see if a RADOS block device exists."""
     try:
         out = check_output(['rbd', 'list', '--id', service, '--pool', pool
-                            ]).decode('UTF-8')
+                            ])
     except CalledProcessError:
         return False
 
@@ -1025,7 +1038,7 @@ def configure(service, key, auth, use_syslog):
 def image_mapped(name):
     """Determine whether a RADOS block device is mapped locally."""
     try:
-        out = check_output(['rbd', 'showmapped']).decode('UTF-8')
+        out = check_output(['rbd', 'showmapped'])
     except CalledProcessError:
         return False
 
@@ -1212,7 +1225,7 @@ def ceph_version():
     """Retrieve the local version of ceph."""
     if os.path.exists('/usr/bin/ceph'):
         cmd = ['ceph', '-v']
-        output = check_output(cmd).decode('US-ASCII')
+        output = check_output(cmd)
         output = output.split()
         if len(output) > 3:
             return output[2]
