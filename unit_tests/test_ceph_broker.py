@@ -345,8 +345,8 @@ class CephBrokerTestCase(unittest.TestCase):
         self.assertEqual(json.loads(rc)['request-id'], '1ef5aede')
 
     @mock.patch('ceph_broker.check_output')
-    @mock.patch('ceph_helpers.Crushmap.load_crushmap')
-    @mock.patch('ceph_helpers.Crushmap.ensure_bucket_is_present')
+    @mock.patch('ceph.ceph_helpers.Crushmap.load_crushmap')
+    @mock.patch('ceph.ceph_helpers.Crushmap.ensure_bucket_is_present')
     @mock.patch('ceph_broker.get_osd_weight')
     @mock.patch('ceph_broker.log')
     def test_process_requests_move_osd(self,

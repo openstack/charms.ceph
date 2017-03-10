@@ -28,7 +28,7 @@ from ceph import (
     get_cephfs,
     get_osd_weight
 )
-from ceph_helpers import Crushmap
+from ceph.ceph_helpers import Crushmap
 from charmhelpers.contrib.storage.linux.ceph import (
     create_erasure_profile,
     delete_pool,
