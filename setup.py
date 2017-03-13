@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 
+import os
 import sys
 from setuptools import setup, find_packages
 from setuptools.command.test import test as TestCommand
@@ -13,17 +14,22 @@ tests_require = [
     'tox >= 2.3.1',
 ]
 
+
 class Tox(TestCommand):
+
     user_options = [('tox-args=', 'a', "Arguments to pass to tox")]
+
     def initialize_options(self):
         TestCommand.initialize_options(self)
         self.tox_args = None
+
     def finalize_options(self):
         TestCommand.finalize_options(self)
         self.test_args = []
         self.test_suite = True
+
     def run_tests(self):
-        #import here, cause outside the eggs aren't loaded
+        # import here, cause outside the eggs aren't loaded
         import tox
         import shlex
         args = self.tox_args
@@ -70,7 +76,7 @@ setup(
     license='Apache-2.0: http://www.apache.org/licenses/LICENSE-2.0',
     packages=find_packages(exclude=["unit_tests"]),
     zip_safe=False,
-    cmdclass = {'test': Tox},
+    cmdclass={'test': Tox},
     install_requires=install_require,
     extras_require={
         'testing': tests_require,
