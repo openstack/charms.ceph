@@ -561,7 +561,7 @@ def _get_child_dirs(path):
     if not os.path.isdir(path):
         raise ValueError('Specified path "%s" is not a directory' % path)
 
-    return filter(os.path.isdir, os.path.listdir(path))
+    return filter(os.path.isdir, os.listdir(path))
 
 
 def _get_osd_num_from_dirname(dirname):
