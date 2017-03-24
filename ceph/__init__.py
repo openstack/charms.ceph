@@ -561,7 +561,8 @@ def _get_child_dirs(path):
     if not os.path.isdir(path):
         raise ValueError('Specified path "%s" is not a directory' % path)
 
-    return filter(os.path.isdir, os.listdir(path))
+    files_in_dir = [os.path.join(path, f) for f in os.listdir(path)]
+    return list(filter(os.path.isdir, files_in_dir))
 
 
 def _get_osd_num_from_dirname(dirname):
@@ -1559,6 +1560,7 @@ def lock_and_roll(upgrade_key, service, my_name, version):
                                                   my_name,
                                                   version,
                                                   stop_timestamp))
+    status_set('maintenance', 'Finishing upgrade')
     monitor_key_set(upgrade_key, "{}_{}_{}_done".format(service,
                                                         my_name,
                                                         version),
@@ -1744,7 +1746,7 @@ def _upgrade_single_osd(osd_num, osd_dir):
     """
     stop_osd(osd_num)
     disable_osd(osd_num)
-    update_owner(os.path.join(OSD_BASE_DIR, osd_dir))
+    update_owner(osd_dir)
     enable_osd(osd_num)
     start_osd(osd_num)
 
@@ -1860,8 +1862,8 @@ def update_owner(path, recurse_dirs=True):
     cmd = ['chown', user_group, path]
     if os.path.isdir(path) and recurse_dirs:
         status_set('maintenance', ('Updating ownership of %s to %s' %
-                                   (path.split('/')[-1], user)))
-        cmd.insert('-R', 1)
+                                   (path, user)))
+        cmd.insert(1, '-R')
 
     log('Changing ownership of {path} to {user}'.format(
         path=path, user=user_group), DEBUG)
@@ -1910,14 +1912,12 @@ def dirs_need_ownership_update(service):
     expected_owner = expected_group = ceph_user()
     path = os.path.join(CEPH_BASE_DIR, service)
     for child in _get_child_dirs(path):
-        child_path = os.path.join(path, child)
-        curr_owner, curr_group = owner(child_path)
+        curr_owner, curr_group = owner(child)
 
         if (curr_owner == expected_owner) and (curr_group == expected_group):
             continue
 
-        log('Directory "%s" needs its ownership updated' % child_path,
-            DEBUG)
+        log('Directory "%s" needs its ownership updated' % child, DEBUG)
         return True
 
     # All child directories had the expected ownership

@@ -155,7 +155,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
     @patch.object(ceph, 'start_osd')
     def test_upgrade_single_osd(self, start_osd, enable_osd, update_owner,
                                 disable_osd, stop_osd):
-        ceph._upgrade_single_osd(1, 'ceph-1')
+        ceph._upgrade_single_osd(1, '/var/lib/ceph/osd/ceph-1')
         stop_osd.assert_called_with(1)
         disable_osd.assert_called_with(1)
         update_owner.assert_called_with('/var/lib/ceph/osd/ceph-1')
@@ -294,6 +294,73 @@ class UpgradeRollingTestCase(unittest.TestCase):
                                          upgrade_key='osd-upgrade',
                                          version='0.94.1')
 
+    @patch('os.path.exists')
+    @patch('os.listdir')
+    @patch('os.path.isdir')
+    def test__get_child_dirs(self, isdir, listdir, exists):
+        isdir.side_effect = [True, True, True, False, True]
+        listdir.return_value = ['mon', 'bootstrap-osd', 'foo', 'bootstrap-mon']
+        exists.return_value = True
+
+        child_dirs = ceph._get_child_dirs('/var/lib/ceph')
+        isdir.assert_has_calls([call('/var/lib/ceph'),
+                                call('/var/lib/ceph/mon'),
+                                call('/var/lib/ceph/bootstrap-osd'),
+                                call('/var/lib/ceph/foo'),
+                                call('/var/lib/ceph/bootstrap-mon')])
+        self.assertListEqual(['/var/lib/ceph/mon',
+                              '/var/lib/ceph/bootstrap-osd',
+                              '/var/lib/ceph/bootstrap-mon'], child_dirs)
+
+    @patch('os.path.exists')
+    @patch('os.path.isdir')
+    def test__get_child_dirs_not_dir(self, isdir, exists):
+        isdir.return_value = False
+        exists.return_value = False
+
+        with self.assertRaises(ValueError):
+            ceph._get_child_dirs('/var/lib/ceph')
+
+    @patch('os.path.exists')
+    def test__get_child_dirs_no_exist(self, exists):
+        exists.return_value = False
+
+        with self.assertRaises(ValueError):
+            ceph._get_child_dirs('/var/lib/ceph')
+
+    @patch('ceph.ceph_user')
+    @patch('os.path.isdir')
+    @patch('subprocess.check_call')
+    @patch('ceph.status_set')
+    def test_update_owner_no_recurse(self, status_set, check_call,
+                                     isdir, ceph_user):
+        ceph_user.return_value = 'ceph'
+        isdir.return_value = True
+        ceph.update_owner('/var/lib/ceph', False)
+        check_call.assert_called_with(['chown', 'ceph:ceph', '/var/lib/ceph'])
+
+    @patch('ceph.ceph_user')
+    @patch('os.path.isdir')
+    @patch('subprocess.check_call')
+    @patch('ceph.status_set')
+    def test_update_owner_recurse_file(self, status_set, check_call,
+                                       isdir, ceph_user):
+        ceph_user.return_value = 'ceph'
+        isdir.return_value = False
+        ceph.update_owner('/var/lib/ceph', True)
+        check_call.assert_called_with(['chown', 'ceph:ceph', '/var/lib/ceph'])
+
+    @patch('ceph.ceph_user')
+    @patch('os.path.isdir')
+    @patch('subprocess.check_call')
+    @patch('ceph.status_set')
+    def test_update_owner_recurse(self, status_set, check_call,
+                                  isdir, ceph_user):
+        ceph_user.return_value = 'ceph'
+        isdir.return_value = True
+        ceph.update_owner('/var/lib/ceph', True)
+        check_call.assert_called_with(['chown', '-R', 'ceph:ceph',
+                                       '/var/lib/ceph'])
 
 """
     @patch('ceph.log')
