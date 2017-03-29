@@ -1338,7 +1338,7 @@ def osdize_dir(path, encrypt=False):
     if cmp_pkgrevno('ceph', "0.56.6") < 0:
         log('Unable to use directories for OSDs with ceph < 0.56.6',
             level=ERROR)
-        raise
+        return
 
     mkdir(path, owner=ceph_user(), group=ceph_user(), perms=0o755)
     chownr('/var/lib/ceph', ceph_user(), ceph_user())
