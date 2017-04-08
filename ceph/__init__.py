@@ -117,6 +117,42 @@ NETWORK_ADAPTER_SYSCTLS = {
 }
 
 
+class Partition(object):
+    def __init__(self, name, number, size, start, end, sectors, uuid):
+        """
+        A block device partition
+        :param name: Name of block device
+        :param number:  Partition number
+        :param size:  Capacity of the device
+        :param start:  Starting block
+        :param end:  Ending block
+        :param sectors:  Number of blocks
+        :param uuid:  UUID of the partition
+        """
+        self.name = name,
+        self.number = number
+        self.size = size
+        self.start = start
+        self.end = end
+        self.sectors = sectors
+        self.uuid = uuid
+
+    def __str__(self):
+        return "number: {} start: {} end: {} sectors: {} size: {} " \
+               "name: {} uuid: {}".format(self.number, self.start,
+                                          self.end,
+                                          self.sectors, self.size,
+                                          self.name, self.uuid)
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self.__dict__ == other.__dict__
+        return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+
 def unmounted_disks():
     """List of unmounted block devices on the current host."""
     disks = []
@@ -759,9 +795,12 @@ DISK_FORMATS = [
 ]
 
 CEPH_PARTITIONS = [
+    '89C57F98-2FE5-4DC0-89C1-5EC00CEFF2BE',  # ceph encrypted disk in creation
+    '45B0969E-9B03-4F30-B4C6-5EC00CEFF106',  # ceph encrypted journal
     '4FBD7E29-9D25-41B8-AFD0-5EC00CEFF05D',  # ceph encrypted osd data
     '4FBD7E29-9D25-41B8-AFD0-062C0CEFF05D',  # ceph osd data
     '45B0969E-9B03-4F30-B4C6-B4B80CEFF106',  # ceph osd journal
+    '89C57F98-2FE5-4DC0-89C1-F3AD0CEFF2BE',  # ceph disk in creation
 ]
 
 
@@ -872,17 +911,48 @@ def replace_osd(dead_osd_number,
         log('replace_osd failed with error: ' + e.output)
 
 
-def is_osd_disk(dev):
+def get_partition_list(dev):
+    """
+    Lists the partitions of a block device
+    :param dev: Path to a block device. ex: /dev/sda
+    :return: :raise:  Returns a list of Partition objects.
+        Raises CalledProcessException if lsblk fails
+    """
+    partitions_list = []
     try:
-        info = check_output(['sgdisk', '-i', '1', dev])
-        info = info.split("\n")  # IGNORE:E1103
-        for line in info:
-            for ptype in CEPH_PARTITIONS:
-                sig = 'Partition GUID code: {}'.format(ptype)
-                if line.startswith(sig):
-                    return True
+        partitions = get_partitions(dev)
+        # For each line of output
+        for partition in partitions:
+            parts = partition.split()
+            partitions_list.append(
+                Partition(number=parts[0],
+                          start=parts[1],
+                          end=parts[2],
+                          sectors=parts[3],
+                          size=parts[4],
+                          name=parts[5],
+                          uuid=parts[6])
+            )
+        return partitions_list
     except subprocess.CalledProcessError:
-        pass
+        raise
+
+
+def is_osd_disk(dev):
+    partitions = get_partition_list(dev)
+    for partition in partitions:
+        try:
+            info = check_output(['sgdisk', '-i', partition.number, dev])
+            info = info.split("\n")  # IGNORE:E1103
+            for line in info:
+                for ptype in CEPH_PARTITIONS:
+                    sig = 'Partition GUID code: {}'.format(ptype)
+                    if line.startswith(sig):
+                        return True
+        except subprocess.CalledProcessError as e:
+            log("sgdisk inspection of partition {} on {} failed with "
+                "error: {}. Skipping".format(partition.minor, dev, e.message),
+                level=ERROR)
     return False
 
 
@@ -1922,7 +1992,6 @@ def dirs_need_ownership_update(service):
 
     # All child directories had the expected ownership
     return False
-
 
 # A dict of valid ceph upgrade paths.  Mapping is old -> new
 UPGRADE_PATHS = {

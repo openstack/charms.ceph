@@ -153,17 +153,17 @@ class CephTestCase(unittest.TestCase):
 
     def test_parse_key_with_caps_existing_key(self):
         expected = "AQCm7aVYQFXXFhAAj0WIeqcag88DKOvY4UKR/g=="
-        with_caps = "[client.osd-upgrade]\n"\
-            "	key = AQCm7aVYQFXXFhAAj0WIeqcag88DKOvY4UKR/g==\n"\
-            "	caps mon = \"allow command \"config-key\";"
+        with_caps = "[client.osd-upgrade]\n" \
+                    "	key = AQCm7aVYQFXXFhAAj0WIeqcag88DKOvY4UKR/g==\n" \
+                    "	caps mon = \"allow command \"config-key\";"
         key = ceph.parse_key(with_caps)
         print("key: {}".format(key))
         self.assertEqual(key, expected)
 
     def test_parse_key_without_caps(self):
         expected = "AQCm7aVYQFXXFhAAj0WIeqcag88DKOvY4UKR/g=="
-        without_caps = "[client.osd-upgrade]\n"\
-            "	key = AQCm7aVYQFXXFhAAj0WIeqcag88DKOvY4UKR/g=="
+        without_caps = "[client.osd-upgrade]\n" \
+                       "	key = AQCm7aVYQFXXFhAAj0WIeqcag88DKOvY4UKR/g=="
         key = ceph.parse_key(without_caps)
         print("key: {}".format(key))
         self.assertEqual(key, expected)
@@ -192,6 +192,13 @@ class CephTestCase(unittest.TestCase):
                                    return_value=True):
                 devices = ceph.unmounted_disks()
                 self.assertEqual(devices, [])
+
+    @mock.patch.object(ceph, 'check_output')
+    def test_get_partition_list(self, output):
+        with open('unit_tests/partx_output', 'r') as partx_out:
+            output.return_value = partx_out.read()
+        partition_list = ceph.get_partition_list('/dev/xvdb')
+        self.assertEqual(len(partition_list), 2)
 
 
 class CephVersionTestCase(unittest.TestCase):
