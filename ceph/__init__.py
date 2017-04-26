@@ -2033,3 +2033,75 @@ def resolve_ceph_version(source):
     '''
     os_release = get_os_codename_install_source(source)
     return UCA_CODENAME_MAP.get(os_release)
+
+
+def get_ceph_pg_stat():
+    """
+    Returns the result of ceph pg stat
+    :return: dict
+    """
+    try:
+        tree = check_output(['ceph', 'pg', 'stat', '--format=json'])
+        try:
+            json_tree = json.loads(tree)
+            if not json_tree['num_pg_by_state']:
+                return None
+            return json_tree
+        except ValueError as v:
+            log("Unable to parse ceph pg stat json: {}. Error: {}".format(
+                tree, v.message))
+            raise
+    except subprocess.CalledProcessError as e:
+        log("ceph pg stat command failed with message: {}".format(
+            e.message))
+        raise
+
+
+def get_ceph_health():
+    """
+    Returns the health of the cluster from a 'ceph health'
+    :return: dict
+      Also raises CalledProcessError if our ceph command fails
+      To get the overall status, use get_ceph_health()['overall_status']
+    """
+    try:
+        tree = check_output(
+            ['ceph', 'health', '--format=json'])
+        try:
+            json_tree = json.loads(tree)
+            # Make sure children are present in the json
+            if not json_tree['overall_status']:
+                return None
+            return json_tree
+        except ValueError as v:
+            log("Unable to parse ceph tree json: {}. Error: {}".format(
+                tree, v.message))
+            raise
+    except subprocess.CalledProcessError as e:
+        log("ceph osd tree command failed with message: {}".format(
+            e.message))
+        raise
+
+
+def reweight_osd(osd_num, new_weight):
+    """
+    Changes the crush weight of an OSD to the value specified.
+    :param osd_num: the osd id which should be changed
+    :param new_weight: the new weight for the OSD
+    :returns: bool.  True if output looks right, else false.
+    :raises CalledProcessError: if an error occurs invoking the systemd cmd
+    """
+    try:
+        cmd_result = subprocess.check_output(
+            ['ceph', 'osd', 'crush', 'reweight', "osd.{}".format(osd_num),
+             new_weight], stderr=subprocess.STDOUT)
+        expected_result = "reweighted item id {ID} name \'osd.{ID}\'".format(
+                          ID=osd_num) + " to {}".format(new_weight)
+        log(cmd_result)
+        if expected_result in cmd_result:
+            return True
+        return False
+    except subprocess.CalledProcessError as e:
+        log("ceph osd tree command failed with message: {}".format(
+            e.message))
+        raise

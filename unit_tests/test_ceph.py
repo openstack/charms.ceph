@@ -16,6 +16,7 @@ import mock
 import unittest
 import ceph
 from subprocess import CalledProcessError
+import subprocess
 
 
 class TestDevice():
@@ -199,6 +200,127 @@ class CephTestCase(unittest.TestCase):
             output.return_value = partx_out.read()
         partition_list = ceph.get_partition_list('/dev/xvdb')
         self.assertEqual(len(partition_list), 2)
+
+    @mock.patch.object(ceph, 'check_output')
+    def test_get_ceph_pg_stat(self, output):
+        """It returns the current PG stat"""
+        output.return_value = """{
+  "num_pg_by_state": [
+    {
+      "name": "active+clean",
+      "num": 320
+    }
+  ],
+  "version": 7111,
+  "num_pgs": 320,
+  "num_bytes": 118111608230,
+  "raw_bytes_used": 355042729984,
+  "raw_bytes_avail": 26627104956416,
+  "raw_bytes": 26982147686400
+}"""
+        pg_stat = ceph.get_ceph_pg_stat()
+        self.assertEqual(pg_stat['num_pgs'], 320)
+
+    @mock.patch.object(ceph, 'check_output')
+    def test_get_ceph_health(self, output):
+        """It gives the current Ceph health"""
+        output.return_value = """{
+  "health": {
+    "health_services": [
+      {
+        "mons": [
+          {
+            "name": "node1",
+            "kb_total": 2883598592,
+            "kb_used": 61728860,
+            "kb_avail": 2675368308,
+            "avail_percent": 92,
+            "last_updated": "2017-04-25 22:17:36.966046",
+            "store_stats": {
+              "bytes_total": 18612017,
+              "bytes_sst": 0,
+              "bytes_log": 2172670,
+              "bytes_misc": 16439347,
+              "last_updated": "0.000000"
+            },
+            "health": "HEALTH_OK"
+          },
+          {
+            "name": "node2",
+            "kb_total": 2883598592,
+            "kb_used": 79776472,
+            "kb_avail": 2657320696,
+            "avail_percent": 92,
+            "last_updated": "2017-04-25 22:18:27.915641",
+            "store_stats": {
+              "bytes_total": 18517923,
+              "bytes_sst": 0,
+              "bytes_log": 3340129,
+              "bytes_misc": 15177794,
+              "last_updated": "0.000000"
+            },
+            "health": "HEALTH_OK"
+          },
+          {
+            "name": "node3",
+            "kb_total": 2883598592,
+            "kb_used": 77399744,
+            "kb_avail": 2659697424,
+            "avail_percent": 92,
+            "last_updated": "2017-04-25 22:18:27.934053",
+            "store_stats": {
+              "bytes_total": 18517892,
+              "bytes_sst": 0,
+              "bytes_log": 3340129,
+              "bytes_misc": 15177763,
+              "last_updated": "0.000000"
+            },
+            "health": "HEALTH_OK"
+          }
+        ]
+      }
+    ]
+  },
+  "timechecks": {
+    "epoch": 8,
+    "round": 3022,
+    "round_status": "finished",
+    "mons": [
+      {
+        "name": "node1",
+        "skew": 0,
+        "latency": 0,
+        "health": "HEALTH_OK"
+      },
+      {
+        "name": "node2",
+        "skew": 0,
+        "latency": 0.000765,
+        "health": "HEALTH_OK"
+      },
+      {
+        "name": "node3",
+        "skew": 0,
+        "latency": 0.000765,
+        "health": "HEALTH_OK"
+      }
+    ]
+  },
+  "summary": [],
+  "overall_status": "HEALTH_OK",
+  "detail": []
+}"""
+        health = ceph.get_ceph_health()
+        self.assertEqual(health['overall_status'], "HEALTH_OK")
+
+    @mock.patch.object(subprocess, 'check_output')
+    def test_reweight_osd(self, mock_reweight):
+        """It changes the weight of an OSD"""
+        mock_reweight.return_value = "reweighted item id 0 name 'osd.0' to 1"
+        reweight_result = ceph.reweight_osd('0', '1')
+        self.assertEqual(reweight_result, True)
+        mock_reweight.assert_called_once_with(
+            ['ceph', 'osd', 'crush', 'reweight', 'osd.0', '1'], stderr=-2)
 
 
 class CephVersionTestCase(unittest.TestCase):
