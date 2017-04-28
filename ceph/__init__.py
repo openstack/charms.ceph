@@ -38,7 +38,9 @@ from charmhelpers.core.host import (
     owner,
     service_restart,
     service_start,
-    service_stop)
+    service_stop,
+    CompareHostReleases,
+)
 from charmhelpers.core.hookenv import (
     cached,
     config,
@@ -46,7 +48,8 @@ from charmhelpers.core.hookenv import (
     status_set,
     DEBUG,
     ERROR,
-    WARNING)
+    WARNING,
+)
 from charmhelpers.fetch import (
     apt_cache,
     add_source, apt_install, apt_update)
@@ -54,13 +57,16 @@ from charmhelpers.contrib.storage.linux.ceph import (
     monitor_key_set,
     monitor_key_exists,
     monitor_key_get,
-    get_mon_map)
+    get_mon_map,
+)
 from charmhelpers.contrib.storage.linux.utils import (
     is_block_device,
     zap_disk,
-    is_device_mounted)
+    is_device_mounted,
+)
 from charmhelpers.contrib.openstack.utils import (
-    get_os_codename_install_source)
+    get_os_codename_install_source,
+)
 
 from ceph.ceph_helpers import check_output
 
@@ -1250,7 +1256,7 @@ def upgrade_key_caps(key, caps):
 
 @cached
 def systemd():
-    return (lsb_release()['DISTRIB_CODENAME'] >= 'vivid')
+    return CompareHostReleases(lsb_release()['DISTRIB_CODENAME']) >= 'vivid'
 
 
 def bootstrap_monitor_cluster(secret):
