@@ -40,6 +40,7 @@ from charmhelpers.core.host import (
     service_start,
     service_stop,
     CompareHostReleases,
+    is_container,
 )
 from charmhelpers.core.hookenv import (
     cached,
@@ -1583,7 +1584,7 @@ def upgrade_monitor(new_version):
                 service_stop('ceph-mon@{}'.format(mon_id))
         else:
             service_stop('ceph-mon-all')
-        apt_install(packages=PACKAGES, fatal=True)
+        apt_install(packages=determine_packages(), fatal=True)
 
         # Ensure the files and directories under /var/lib/ceph is chowned
         # properly as part of the move to the Jewel release, which moved the
@@ -1767,7 +1768,7 @@ def upgrade_osd(new_version):
     try:
         # Upgrade the packages before restarting the daemons.
         status_set('maintenance', 'Upgrading packages to %s' % new_version)
-        apt_install(packages=PACKAGES, fatal=True)
+        apt_install(packages=determine_packages(), fatal=True)
 
         # If the upgrade does not need an ownership update of any of the
         # directories in the osd service directory, then simply restart
@@ -2105,3 +2106,14 @@ def reweight_osd(osd_num, new_weight):
         log("ceph osd tree command failed with message: {}".format(
             e.message))
         raise
+
+
+def determine_packages():
+    '''
+    Determines packages for installation.
+
+    @returns: list of ceph packages
+    '''
+    if is_container():
+        PACKAGES.remove('ntp')
+    return PACKAGES

@@ -322,6 +322,15 @@ class CephTestCase(unittest.TestCase):
         mock_reweight.assert_called_once_with(
             ['ceph', 'osd', 'crush', 'reweight', 'osd.0', '1'], stderr=-2)
 
+    @mock.patch.object(ceph, 'is_container')
+    def test_determine_packages(self, mock_is_container):
+        mock_is_container.return_value = False
+        self.assertTrue('ntp' in ceph.determine_packages())
+        self.assertEqual(ceph.PACKAGES, ceph.determine_packages())
+
+        mock_is_container.return_value = True
+        self.assertFalse('ntp' in ceph.determine_packages())
+
 
 class CephVersionTestCase(unittest.TestCase):
     @mock.patch.object(ceph, 'get_os_codename_install_source')
