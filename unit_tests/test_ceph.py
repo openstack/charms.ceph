@@ -331,6 +331,83 @@ class CephTestCase(unittest.TestCase):
         mock_is_container.return_value = True
         self.assertFalse('ntp' in ceph.determine_packages())
 
+    @mock.patch.object(ceph, 'chownr')
+    @mock.patch.object(ceph, 'cmp_pkgrevno')
+    @mock.patch.object(ceph, 'ceph_user')
+    @mock.patch.object(ceph, 'os')
+    @mock.patch.object(ceph, 'systemd')
+    @mock.patch.object(ceph, 'log')
+    @mock.patch.object(ceph, 'mkdir')
+    @mock.patch.object(ceph, 'subprocess')
+    @mock.patch.object(ceph, 'service_restart')
+    def _test_bootstrap_monitor_cluster(self,
+                                        mock_service_restart,
+                                        mock_subprocess,
+                                        mock_mkdir,
+                                        mock_log,
+                                        mock_systemd,
+                                        mock_os,
+                                        mock_ceph_user,
+                                        mock_cmp_pkgrevno,
+                                        mock_chownr,
+                                        luminos=False):
+        test_hostname = ceph.socket.gethostname()
+        test_secret = 'mysecret'
+        test_keyring = '/var/lib/ceph/tmp/{}.mon.keyring'.format(test_hostname)
+        test_path = '/var/lib/ceph/mon/ceph-{}'.format(test_hostname)
+        test_done = '{}/done'.format(test_path)
+        test_init_marker = '{}/systemd'.format(test_path)
+
+        mock_os.path.exists.return_value = False
+        mock_systemd.return_value = True
+        mock_cmp_pkgrevno.return_value = 1 if luminos else -1
+        mock_ceph_user.return_value = 'ceph'
+
+        test_calls = [
+            mock.call(
+                ['ceph-authtool', test_keyring,
+                 '--create-keyring', '--name=mon.',
+                 '--add-key={}'.format(test_secret),
+                 '--cap', 'mon', 'allow *']
+            ),
+            mock.call(
+                ['ceph-mon', '--mkfs',
+                 '-i', test_hostname,
+                 '--keyring', test_keyring]
+            ),
+            mock.call(['systemctl', 'enable', 'ceph-mon']),
+        ]
+        if luminos:
+            test_calls.append(
+                mock.call(['ceph-create-keys', '--id', test_hostname])
+            )
+
+        mock_open = mock.mock_open()
+        with mock.patch('ceph.open', mock_open, create=True):
+            ceph.bootstrap_monitor_cluster(test_secret)
+
+        self.assertEqual(
+            mock_subprocess.check_call.mock_calls,
+            test_calls
+        )
+        mock_service_restart.assert_called_with('ceph-mon')
+        mock_mkdir.assert_has_calls([
+            mock.call('/var/run/ceph', owner='ceph',
+                      group='ceph', perms=0o755),
+            mock.call(test_path, owner='ceph', group='ceph'),
+        ])
+        mock_open.assert_has_calls([
+            mock.call(test_done, 'w'),
+            mock.call(test_init_marker, 'w'),
+        ], any_order=True)
+        mock_os.unlink.assert_called_with(test_keyring)
+
+    def test_bootstrap_monitor_cluster(self):
+        self._test_bootstrap_monitor_cluster(luminos=False)
+
+    def test_bootstrap_monitor_cluster_luminous(self):
+        self._test_bootstrap_monitor_cluster(luminos=True)
+
 
 class CephVersionTestCase(unittest.TestCase):
     @mock.patch.object(ceph, 'get_os_codename_install_source')

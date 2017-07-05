@@ -3,3 +3,7 @@
 .tox
 *.sw[nop]
 *.pyc
+*.egg-info
+dist
+.project
+.pydevproject

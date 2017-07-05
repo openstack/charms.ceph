@@ -1299,6 +1299,15 @@ def bootstrap_monitor_cluster(secret):
                 service_restart('ceph-mon')
             else:
                 service_restart('ceph-mon-all')
+
+            if cmp_pkgrevno('ceph', '12.0.0') >= 0:
+                # NOTE(jamespage): Later ceph releases require explicit
+                #                  call to ceph-create-keys to setup the
+                #                  admin keys for the cluster; this command
+                #                  will wait for quorum in the cluster before
+                #                  returning.
+                cmd = ['ceph-create-keys', '--id', hostname]
+                subprocess.check_call(cmd)
         except:
             raise
         finally:
