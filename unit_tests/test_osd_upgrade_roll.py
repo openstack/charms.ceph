@@ -12,15 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
 import os
-import unittest
 import sys
+import time
+import unittest
 
 from mock import patch, call, mock_open
 
-import ceph
-from ceph import CrushLocation
+import ceph.utils
 
 TO_PATCH = [
     'apt_install',
@@ -63,18 +62,18 @@ def monitor_key_side_effect(*args):
 
 
 class UpgradeRollingTestCase(unittest.TestCase):
-    @patch('ceph.dirs_need_ownership_update')
-    @patch('ceph.apt_install')
-    @patch('ceph.chownr')
-    @patch('ceph.service_restart')
-    @patch('ceph.log')
-    @patch('ceph.status_set')
-    @patch('ceph.apt_update')
-    @patch('ceph.add_source')
-    @patch('ceph.get_local_osd_ids')
-    @patch('ceph.systemd')
-    @patch('ceph.get_version')
-    @patch('ceph.config')
+    @patch.object(ceph.utils, 'dirs_need_ownership_update')
+    @patch.object(ceph.utils, 'apt_install')
+    @patch.object(ceph.utils, 'chownr')
+    @patch.object(ceph.utils, 'service_restart')
+    @patch.object(ceph.utils, 'log')
+    @patch.object(ceph.utils, 'status_set')
+    @patch.object(ceph.utils, 'apt_update')
+    @patch.object(ceph.utils, 'add_source')
+    @patch.object(ceph.utils, 'get_local_osd_ids')
+    @patch.object(ceph.utils, 'systemd')
+    @patch.object(ceph.utils, 'get_version')
+    @patch.object(ceph.utils, 'config')
     def test_upgrade_osd_hammer(self, config, get_version, systemd, local_osds,
                                 add_source, apt_update, status_set, log,
                                 service_restart, chownr, apt_install,
@@ -85,7 +84,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
         local_osds.return_value = [0, 1, 2]
         dirs_need_ownership_update.return_value = False
 
-        ceph.upgrade_osd('hammer')
+        ceph.utils.upgrade_osd('hammer')
         service_restart.assert_called_with('ceph-osd-all')
         status_set.assert_has_calls([
             call('maintenance', 'Upgrading osd'),
@@ -99,20 +98,20 @@ class UpgradeRollingTestCase(unittest.TestCase):
         # Make sure on an Upgrade to Hammer that chownr was NOT called.
         assert not chownr.called
 
-    @patch('ceph._upgrade_single_osd')
-    @patch('ceph.update_owner')
+    @patch.object(ceph.utils, '_upgrade_single_osd')
+    @patch.object(ceph.utils, 'update_owner')
     @patch('os.listdir')
-    @patch('ceph._get_child_dirs')
-    @patch('ceph.dirs_need_ownership_update')
-    @patch('ceph.apt_install')
-    @patch('ceph.log')
-    @patch('ceph.status_set')
-    @patch('ceph.apt_update')
-    @patch('ceph.add_source')
-    @patch('ceph.get_local_osd_ids')
-    @patch('ceph.systemd')
-    @patch('ceph.get_version')
-    @patch('ceph.config')
+    @patch.object(ceph.utils, '_get_child_dirs')
+    @patch.object(ceph.utils, 'dirs_need_ownership_update')
+    @patch.object(ceph.utils, 'apt_install')
+    @patch.object(ceph.utils, 'log')
+    @patch.object(ceph.utils, 'status_set')
+    @patch.object(ceph.utils, 'apt_update')
+    @patch.object(ceph.utils, 'add_source')
+    @patch.object(ceph.utils, 'get_local_osd_ids')
+    @patch.object(ceph.utils, 'systemd')
+    @patch.object(ceph.utils, 'get_version')
+    @patch.object(ceph.utils, 'config')
     def test_upgrade_osd_jewel(self, config, get_version, systemd,
                                local_osds, add_source, apt_update, status_set,
                                log, apt_install, dirs_need_ownership_update,
@@ -126,11 +125,11 @@ class UpgradeRollingTestCase(unittest.TestCase):
         _get_child_dirs.return_value = ['ceph-0', 'ceph-1', 'ceph-2']
         dirs_need_ownership_update.return_value = True
 
-        ceph.upgrade_osd('jewel')
+        ceph.utils.upgrade_osd('jewel')
         update_owner.assert_has_calls([
-            call(ceph.CEPH_BASE_DIR, recurse_dirs=False),
-            call(os.path.join(ceph.CEPH_BASE_DIR, 'mon')),
-            call(os.path.join(ceph.CEPH_BASE_DIR, 'fs')),
+            call(ceph.utils.CEPH_BASE_DIR, recurse_dirs=False),
+            call(os.path.join(ceph.utils.CEPH_BASE_DIR, 'mon')),
+            call(os.path.join(ceph.utils.CEPH_BASE_DIR, 'fs')),
         ])
         _upgrade_single_osd.assert_has_calls([
             call('0', 'ceph-0'),
@@ -148,62 +147,62 @@ class UpgradeRollingTestCase(unittest.TestCase):
             ]
         )
 
-    @patch.object(ceph, 'stop_osd')
-    @patch.object(ceph, 'disable_osd')
-    @patch.object(ceph, 'update_owner')
-    @patch.object(ceph, 'enable_osd')
-    @patch.object(ceph, 'start_osd')
+    @patch.object(ceph.utils, 'stop_osd')
+    @patch.object(ceph.utils, 'disable_osd')
+    @patch.object(ceph.utils, 'update_owner')
+    @patch.object(ceph.utils, 'enable_osd')
+    @patch.object(ceph.utils, 'start_osd')
     def test_upgrade_single_osd(self, start_osd, enable_osd, update_owner,
                                 disable_osd, stop_osd):
-        ceph._upgrade_single_osd(1, '/var/lib/ceph/osd/ceph-1')
+        ceph.utils._upgrade_single_osd(1, '/var/lib/ceph/osd/ceph-1')
         stop_osd.assert_called_with(1)
         disable_osd.assert_called_with(1)
         update_owner.assert_called_with('/var/lib/ceph/osd/ceph-1')
         enable_osd.assert_called_with(1)
         start_osd.assert_called_with(1)
 
-    @patch.object(ceph, 'systemd')
-    @patch.object(ceph, 'service_stop')
+    @patch.object(ceph.utils, 'systemd')
+    @patch.object(ceph.utils, 'service_stop')
     def test_stop_osd(self, service_stop, systemd):
         systemd.return_value = False
-        ceph.stop_osd(1)
+        ceph.utils.stop_osd(1)
         service_stop.assert_called_with('ceph-osd', id=1)
 
         systemd.return_value = True
-        ceph.stop_osd(2)
+        ceph.utils.stop_osd(2)
         service_stop.assert_called_with('ceph-osd@2')
 
-    @patch.object(ceph, 'systemd')
-    @patch.object(ceph, 'service_start')
+    @patch.object(ceph.utils, 'systemd')
+    @patch.object(ceph.utils, 'service_start')
     def test_start_osd(self, service_start, systemd):
         systemd.return_value = False
-        ceph.start_osd(1)
+        ceph.utils.start_osd(1)
         service_start.assert_called_with('ceph-osd', id=1)
 
         systemd.return_value = True
-        ceph.start_osd(2)
+        ceph.utils.start_osd(2)
         service_start.assert_called_with('ceph-osd@2')
 
     @patch('subprocess.check_call')
     @patch('os.path.exists')
     @patch('os.unlink')
-    @patch('ceph.systemd')
+    @patch.object(ceph.utils, 'systemd')
     def test_disable_osd(self, systemd, unlink, exists, check_call):
         systemd.return_value = True
-        ceph.disable_osd(4)
+        ceph.utils.disable_osd(4)
         check_call.assert_called_with(['systemctl', 'disable', 'ceph-osd@4'])
 
         exists.return_value = True
         systemd.return_value = False
-        ceph.disable_osd(3)
+        ceph.utils.disable_osd(3)
         unlink.assert_called_with('/var/lib/ceph/osd/ceph-3/ready')
 
     @patch('subprocess.check_call')
-    @patch('ceph.update_owner')
-    @patch('ceph.systemd')
+    @patch.object(ceph.utils, 'update_owner')
+    @patch.object(ceph.utils, 'systemd')
     def test_enable_osd(self, systemd, update_owner, check_call):
         systemd.return_value = True
-        ceph.enable_osd(5)
+        ceph.utils.enable_osd(5)
         check_call.assert_called_with(['systemctl', 'enable', 'ceph-osd@5'])
 
         systemd.return_value = False
@@ -212,17 +211,17 @@ class UpgradeRollingTestCase(unittest.TestCase):
         # the python version.
         bs = 'builtins' if sys.version_info > (3, 0) else '__builtin__'
         with patch('%s.open' % bs, mo):
-            ceph.enable_osd(6)
+            ceph.utils.enable_osd(6)
         mo.assert_called_once_with('/var/lib/ceph/osd/ceph-6/ready', 'w')
         handle = mo()
         handle.write.assert_called_with('ready')
         update_owner.assert_called_with('/var/lib/ceph/osd/ceph-6/ready')
 
-    @patch('ceph.socket')
-    @patch('ceph.get_osd_tree')
-    @patch('ceph.log')
-    @patch('ceph.lock_and_roll')
-    @patch('ceph.get_upgrade_position')
+    @patch.object(ceph.utils, 'socket')
+    @patch.object(ceph.utils, 'get_osd_tree')
+    @patch.object(ceph.utils, 'log')
+    @patch.object(ceph.utils, 'lock_and_roll')
+    @patch.object(ceph.utils, 'get_upgrade_position')
     def test_roll_osd_cluster_first(self,
                                     get_upgrade_position,
                                     lock_and_roll,
@@ -233,8 +232,8 @@ class UpgradeRollingTestCase(unittest.TestCase):
         get_osd_tree.return_value = ""
         get_upgrade_position.return_value = 0
 
-        ceph.roll_osd_cluster(new_version='0.94.1',
-                              upgrade_key='osd-upgrade')
+        ceph.utils.roll_osd_cluster(new_version='0.94.1',
+                                    upgrade_key='osd-upgrade')
         log.assert_has_calls(
             [
                 call('roll_osd_cluster called with 0.94.1'),
@@ -247,12 +246,12 @@ class UpgradeRollingTestCase(unittest.TestCase):
                                          upgrade_key='osd-upgrade',
                                          service='osd')
 
-    @patch('ceph.get_osd_tree')
-    @patch('ceph.socket')
-    @patch('ceph.status_set')
-    @patch('ceph.lock_and_roll')
-    @patch('ceph.get_upgrade_position')
-    @patch('ceph.wait_on_previous_node')
+    @patch.object(ceph.utils, 'get_osd_tree')
+    @patch.object(ceph.utils, 'socket')
+    @patch.object(ceph.utils, 'status_set')
+    @patch.object(ceph.utils, 'lock_and_roll')
+    @patch.object(ceph.utils, 'get_upgrade_position')
+    @patch.object(ceph.utils, 'wait_on_previous_node')
     def test_roll_osd_cluster_second(self,
                                      wait_on_previous_node,
                                      get_upgrade_position,
@@ -263,7 +262,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
         wait_on_previous_node.return_value = None
         socket.gethostname.return_value = "ip-192-168-1-3"
         get_osd_tree.return_value = [
-            CrushLocation(
+            ceph.utils.CrushLocation(
                 name="ip-192-168-1-2",
                 identifier='a',
                 host='host-a',
@@ -272,7 +271,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
                 datacenter='dc-1',
                 chassis='chassis-a',
                 root='ceph'),
-            CrushLocation(
+            ceph.utils.CrushLocation(
                 name="ip-192-168-1-3",
                 identifier='a',
                 host='host-b',
@@ -284,8 +283,8 @@ class UpgradeRollingTestCase(unittest.TestCase):
         ]
         get_upgrade_position.return_value = 1
 
-        ceph.roll_osd_cluster(new_version='0.94.1',
-                              upgrade_key='osd-upgrade')
+        ceph.utils.roll_osd_cluster(new_version='0.94.1',
+                                    upgrade_key='osd-upgrade')
         status_set.assert_called_with(
             'blocked',
             'Waiting on ip-192-168-1-2 to finish upgrading')
@@ -302,7 +301,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
         listdir.return_value = ['mon', 'bootstrap-osd', 'foo', 'bootstrap-mon']
         exists.return_value = True
 
-        child_dirs = ceph._get_child_dirs('/var/lib/ceph')
+        child_dirs = ceph.utils._get_child_dirs('/var/lib/ceph')
         isdir.assert_has_calls([call('/var/lib/ceph'),
                                 call('/var/lib/ceph/mon'),
                                 call('/var/lib/ceph/bootstrap-osd'),
@@ -319,54 +318,54 @@ class UpgradeRollingTestCase(unittest.TestCase):
         exists.return_value = False
 
         with self.assertRaises(ValueError):
-            ceph._get_child_dirs('/var/lib/ceph')
+            ceph.utils._get_child_dirs('/var/lib/ceph')
 
     @patch('os.path.exists')
     def test__get_child_dirs_no_exist(self, exists):
         exists.return_value = False
 
         with self.assertRaises(ValueError):
-            ceph._get_child_dirs('/var/lib/ceph')
+            ceph.utils._get_child_dirs('/var/lib/ceph')
 
-    @patch('ceph.ceph_user')
+    @patch.object(ceph.utils, 'ceph_user')
     @patch('os.path.isdir')
     @patch('subprocess.check_call')
-    @patch('ceph.status_set')
+    @patch.object(ceph.utils, 'status_set')
     def test_update_owner_no_recurse(self, status_set, check_call,
                                      isdir, ceph_user):
         ceph_user.return_value = 'ceph'
         isdir.return_value = True
-        ceph.update_owner('/var/lib/ceph', False)
+        ceph.utils.update_owner('/var/lib/ceph', False)
         check_call.assert_called_with(['chown', 'ceph:ceph', '/var/lib/ceph'])
 
-    @patch('ceph.ceph_user')
+    @patch.object(ceph.utils, 'ceph_user')
     @patch('os.path.isdir')
     @patch('subprocess.check_call')
-    @patch('ceph.status_set')
+    @patch.object(ceph.utils, 'status_set')
     def test_update_owner_recurse_file(self, status_set, check_call,
                                        isdir, ceph_user):
         ceph_user.return_value = 'ceph'
         isdir.return_value = False
-        ceph.update_owner('/var/lib/ceph', True)
+        ceph.utils.update_owner('/var/lib/ceph', True)
         check_call.assert_called_with(['chown', 'ceph:ceph', '/var/lib/ceph'])
 
-    @patch('ceph.ceph_user')
+    @patch.object(ceph.utils, 'ceph_user')
     @patch('os.path.isdir')
     @patch('subprocess.check_call')
-    @patch('ceph.status_set')
+    @patch.object(ceph.utils, 'status_set')
     def test_update_owner_recurse(self, status_set, check_call,
                                   isdir, ceph_user):
         ceph_user.return_value = 'ceph'
         isdir.return_value = True
-        ceph.update_owner('/var/lib/ceph', True)
+        ceph.utils.update_owner('/var/lib/ceph', True)
         check_call.assert_called_with(['chown', '-R', 'ceph:ceph',
                                        '/var/lib/ceph'])
 
 """
-    @patch('ceph.log')
+    @patch.object(ceph.utils, 'log')
     @patch('time.time', lambda *args: previous_node_start_time + 10 * 60 + 1)
-    @patch('ceph.monitor_key_get')
-    @patch('ceph.monitor_key_exists')
+    @patch.object(ceph.utils, 'monitor_key_get')
+    @patch.object(ceph.utils, 'monitor_key_exists')
     def test_wait_on_previous_node(self,
                                    monitor_key_exists,
                                    monitor_key_get,
@@ -374,10 +373,10 @@ class UpgradeRollingTestCase(unittest.TestCase):
         monitor_key_get.side_effect = monitor_key_side_effect
         monitor_key_exists.return_value = False
 
-        ceph.wait_on_previous_node(previous_node="ip-192-168-1-2",
-                                   version='0.94.1',
-                                   service='osd',
-                                   upgrade_key='osd-upgrade')
+        ceph.utils.wait_on_previous_node(previous_node="ip-192-168-1-2",
+                                          version='0.94.1',
+                                          service='osd',
+                                          upgrade_key='osd-upgrade')
 
         # Make sure we checked to see if the previous node started
         monitor_key_get.assert_has_calls(

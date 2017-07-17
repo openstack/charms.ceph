@@ -11,13 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import unittest
+
 import sys
 import time
+import unittest
 
 from mock import patch, call, MagicMock
 
-import ceph
+import ceph.utils
 
 # python-apt is not installed as part of test-requirements but is imported by
 # some charmhelpers modules so create a fake import.
@@ -51,16 +52,16 @@ def monitor_key_side_effect(*args):
 class UpgradeRollingTestCase(unittest.TestCase):
 
     @patch('time.time')
-    @patch('ceph.log')
-    @patch('ceph.upgrade_monitor')
-    @patch('ceph.monitor_key_set')
+    @patch.object(ceph.utils, 'log')
+    @patch.object(ceph.utils, 'upgrade_monitor')
+    @patch.object(ceph.utils, 'monitor_key_set')
     def test_lock_and_roll(self, monitor_key_set, upgrade_monitor, log, time):
         time.return_value = 1473279502.69
         monitor_key_set.monitor_key_set.return_value = None
-        ceph.lock_and_roll(my_name='ip-192-168-1-2',
-                           version='hammer',
-                           service='mon',
-                           upgrade_key='admin')
+        ceph.utils.lock_and_roll(my_name='ip-192-168-1-2',
+                                 version='hammer',
+                                 service='mon',
+                                 upgrade_key='admin')
         upgrade_monitor.assert_called_once_with('hammer')
         log.assert_has_calls(
             [
@@ -72,18 +73,18 @@ class UpgradeRollingTestCase(unittest.TestCase):
                      'mon_ip-192-168-1-2_hammer_done 1473279502.69'),
             ])
 
-    @patch('ceph.apt_install')
-    @patch('ceph.chownr')
-    @patch('ceph.service_stop')
-    @patch('ceph.service_start')
-    @patch('ceph.log')
-    @patch('ceph.status_set')
-    @patch('ceph.apt_update')
-    @patch('ceph.add_source')
-    @patch('ceph.get_local_mon_ids')
-    @patch('ceph.systemd')
-    @patch('ceph.get_version')
-    @patch('ceph.config')
+    @patch.object(ceph.utils, 'apt_install')
+    @patch.object(ceph.utils, 'chownr')
+    @patch.object(ceph.utils, 'service_stop')
+    @patch.object(ceph.utils, 'service_start')
+    @patch.object(ceph.utils, 'log')
+    @patch.object(ceph.utils, 'status_set')
+    @patch.object(ceph.utils, 'apt_update')
+    @patch.object(ceph.utils, 'add_source')
+    @patch.object(ceph.utils, 'get_local_mon_ids')
+    @patch.object(ceph.utils, 'systemd')
+    @patch.object(ceph.utils, 'get_version')
+    @patch.object(ceph.utils, 'config')
     def test_upgrade_monitor_hammer(self, config, get_version,
                                     systemd, local_mons, add_source,
                                     apt_update, status_set, log,
@@ -94,7 +95,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
         systemd.return_value = False
         local_mons.return_value = ['a']
 
-        ceph.upgrade_monitor('hammer')
+        ceph.utils.upgrade_monitor('hammer')
         service_stop.assert_called_with('ceph-mon-all')
         service_start.assert_called_with('ceph-mon-all')
         add_source.assert_called_with('cloud:trusty-kilo', 'key')
@@ -110,18 +111,18 @@ class UpgradeRollingTestCase(unittest.TestCase):
         ])
         assert not chownr.called
 
-    @patch('ceph.apt_install')
-    @patch('ceph.chownr')
-    @patch('ceph.service_stop')
-    @patch('ceph.service_start')
-    @patch('ceph.log')
-    @patch('ceph.status_set')
-    @patch('ceph.apt_update')
-    @patch('ceph.add_source')
-    @patch('ceph.get_local_mon_ids')
-    @patch('ceph.systemd')
-    @patch('ceph.get_version')
-    @patch('ceph.config')
+    @patch.object(ceph.utils, 'apt_install')
+    @patch.object(ceph.utils, 'chownr')
+    @patch.object(ceph.utils, 'service_stop')
+    @patch.object(ceph.utils, 'service_start')
+    @patch.object(ceph.utils, 'log')
+    @patch.object(ceph.utils, 'status_set')
+    @patch.object(ceph.utils, 'apt_update')
+    @patch.object(ceph.utils, 'add_source')
+    @patch.object(ceph.utils, 'get_local_mon_ids')
+    @patch.object(ceph.utils, 'systemd')
+    @patch.object(ceph.utils, 'get_version')
+    @patch.object(ceph.utils, 'config')
     def test_upgrade_monitor_jewel(self, config, get_version,
                                    systemd, local_mons, add_source,
                                    apt_update, status_set, log,
@@ -132,7 +133,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
         systemd.return_value = False
         local_mons.return_value = ['a']
 
-        ceph.upgrade_monitor('jewel')
+        ceph.utils.upgrade_monitor('jewel')
         service_stop.assert_called_with('ceph-mon-all')
         service_start.assert_called_with('ceph-mon-all')
         add_source.assert_called_with('cloud:trusty-kilo', 'key')
@@ -153,12 +154,12 @@ class UpgradeRollingTestCase(unittest.TestCase):
             ]
         )
 
-    @patch('ceph.get_version')
-    @patch('ceph.status_set')
-    @patch('ceph.lock_and_roll')
-    @patch('ceph.wait_on_previous_node')
-    @patch('ceph.get_mon_map')
-    @patch('ceph.socket')
+    @patch.object(ceph.utils, 'get_version')
+    @patch.object(ceph.utils, 'status_set')
+    @patch.object(ceph.utils, 'lock_and_roll')
+    @patch.object(ceph.utils, 'wait_on_previous_node')
+    @patch.object(ceph.utils, 'get_mon_map')
+    @patch.object(ceph.utils, 'socket')
     def test_roll_monitor_cluster_second(self,
                                          socket,
                                          get_mon_map,
@@ -181,8 +182,8 @@ class UpgradeRollingTestCase(unittest.TestCase):
                 ]
             }
         }
-        ceph.roll_monitor_cluster(new_version='0.94.1',
-                                  upgrade_key='admin')
+        ceph.utils.roll_monitor_cluster(new_version='0.94.1',
+                                        upgrade_key='admin')
         status_set.assert_called_with(
             'waiting',
             'Waiting on ip-192-168-1-2 to finish upgrading')
@@ -191,10 +192,10 @@ class UpgradeRollingTestCase(unittest.TestCase):
                                          upgrade_key='admin',
                                          version='0.94.1')
 
-    @patch('ceph.log')
-    @patch.object(ceph, 'time')
-    @patch('ceph.monitor_key_get')
-    @patch('ceph.monitor_key_exists')
+    @patch.object(ceph.utils, 'log')
+    @patch.object(ceph.utils, 'time')
+    @patch.object(ceph.utils, 'monitor_key_get')
+    @patch.object(ceph.utils, 'monitor_key_exists')
     def test_wait_on_previous_node(self, monitor_key_exists, monitor_key_get,
                                    mock_time, log):
         tval = [previous_node_start_time]
@@ -207,10 +208,10 @@ class UpgradeRollingTestCase(unittest.TestCase):
         monitor_key_get.side_effect = monitor_key_side_effect
         monitor_key_exists.return_value = False
 
-        ceph.wait_on_previous_node(previous_node="ip-192-168-1-2",
-                                   version='0.94.1',
-                                   service='mon',
-                                   upgrade_key='admin')
+        ceph.utils.wait_on_previous_node(previous_node="ip-192-168-1-2",
+                                         version='0.94.1',
+                                         service='mon',
+                                         upgrade_key='admin')
 
         # Make sure we checked to see if the previous node started
         monitor_key_get.assert_has_calls(

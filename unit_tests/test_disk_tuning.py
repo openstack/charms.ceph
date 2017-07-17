@@ -12,16 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import ceph
-import mock
 import unittest
+
+from mock import patch
+
+import ceph.utils
 
 
 class DiskTuningTestCase(unittest.TestCase):
     def setUp(self):
         super(DiskTuningTestCase, self).setUp()
 
-    @mock.patch.object(ceph, 'templating')
+    @patch.object(ceph.utils, 'templating')
     def test_persist_settings(self, _templating):
         renderer = _templating.render
         settings = {
@@ -31,13 +33,13 @@ class DiskTuningTestCase(unittest.TestCase):
                 }
             }
         }
-        ceph.persist_settings(settings)
+        ceph.utils.persist_settings(settings)
         renderer.assert_called_once_with(source='hdparm.conf',
-                                         target=ceph.HDPARM_FILE,
+                                         target=ceph.utils.HDPARM_FILE,
                                          context=settings)
 
-    @mock.patch.object(ceph, 'templating')
+    @patch.object(ceph.utils, 'templating')
     def test_persist_settings_empty_dict(self, _templating):
         renderer = _templating.render
-        ceph.persist_settings({})
+        ceph.utils.persist_settings({})
         assert not renderer.called, 'renderer should not have been called'

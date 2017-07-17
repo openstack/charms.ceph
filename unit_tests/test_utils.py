@@ -12,11 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import mock
 import unittest
-import ceph
+
+from mock import (
+    call,
+    mock_open,
+    MagicMock,
+    patch,
+)
+
+import ceph.utils as utils
+
 from subprocess import CalledProcessError
-import subprocess
 
 
 class TestDevice():
@@ -39,7 +46,7 @@ class CephTestCase(unittest.TestCase):
     def setUp(self):
         super(CephTestCase, self).setUp()
 
-    @mock.patch.object(ceph, 'check_output')
+    @patch.object(utils.subprocess, 'check_output')
     def test_get_osd_weight(self, output):
         """It gives an OSD's weight"""
         output.return_value = """{
@@ -103,105 +110,91 @@ class CephTestCase(unittest.TestCase):
     }],
     "stray": []
 }"""
-        weight = ceph.get_osd_weight('osd.0')
+        weight = utils.get_osd_weight('osd.0')
         self.assertEqual(weight, 0.002899)
 
-    def test_get_named_key_with_pool(self):
-        with mock.patch.object(ceph, "ceph_user", return_value="ceph"):
-            with mock.patch.object(ceph, "check_output") \
-                    as subprocess:
-                with mock.patch.object(ceph.socket, "gethostname",
-                                       return_value="osd001"):
-                    subprocess.side_effect = [
-                        CalledProcessError(0, 0, 0), ""]
-                    ceph.get_named_key(name="rgw001",
-                                       pool_list=["rbd", "block"])
-                    subprocess.assert_has_calls([
-                        mock.call(['sudo', '-u', 'ceph', 'ceph', '--name',
-                                   'mon.', '--keyring',
-                                   '/var/lib/ceph/mon/ceph-osd001/keyring',
-                                   'auth', 'get', 'client.rgw001']),
-                        mock.call(['sudo', '-u', 'ceph', 'ceph', '--name',
-                                   'mon.', '--keyring',
-                                   '/var/lib/ceph/mon/ceph-osd001/keyring',
-                                   'auth', 'get-or-create', 'client.rgw001',
-                                   'mon', 'allow r', 'osd',
-                                   'allow rwx pool=rbd pool=block'])])
+    @patch.object(utils.subprocess, 'check_output')
+    @patch.object(utils, "ceph_user", lambda: "ceph")
+    @patch.object(utils.socket, "gethostname", lambda: "osd001")
+    def test_get_named_key_with_pool(self, mock_check_output):
+        mock_check_output.side_effect = [CalledProcessError(0, 0, 0), ""]
+        utils.get_named_key(name="rgw001", pool_list=["rbd", "block"])
+        mock_check_output.assert_has_calls([
+            call(['sudo', '-u', 'ceph', 'ceph', '--name',
+                  'mon.', '--keyring',
+                  '/var/lib/ceph/mon/ceph-osd001/keyring',
+                  'auth', 'get', 'client.rgw001']),
+            call(['sudo', '-u', 'ceph', 'ceph', '--name',
+                  'mon.', '--keyring',
+                  '/var/lib/ceph/mon/ceph-osd001/keyring',
+                  'auth', 'get-or-create', 'client.rgw001',
+                  'mon', 'allow r', 'osd',
+                  'allow rwx pool=rbd pool=block'])])
 
-    def test_get_named_key(self):
-        with mock.patch.object(ceph, "ceph_user", return_value="ceph"):
-            with mock.patch.object(ceph, "check_output") \
-                    as subprocess:
-                subprocess.side_effect = [
-                    CalledProcessError(0, 0, 0),
-                    ""]
-                with mock.patch.object(ceph.socket, "gethostname",
-                                       return_value="osd001"):
-                    ceph.get_named_key(name="rgw001")
-                    for call in subprocess.mock_calls:
-                        print("Subprocess: {}".format(call))
-                    subprocess.assert_has_calls([
-                        mock.call(['sudo', '-u', 'ceph', 'ceph', '--name',
-                                   'mon.', '--keyring',
-                                   '/var/lib/ceph/mon/ceph-osd001/keyring',
-                                   'auth', 'get', 'client.rgw001']),
-                        mock.call(['sudo', '-u', 'ceph', 'ceph', '--name',
-                                   'mon.', '--keyring',
-                                   '/var/lib/ceph/mon/ceph-osd001/keyring',
-                                   'auth', 'get-or-create', 'client.rgw001',
-                                   'mon', 'allow r', 'osd',
-                                   'allow rwx'])])
+    @patch.object(utils.subprocess, 'check_output')
+    @patch.object(utils, 'ceph_user', lambda: "ceph")
+    @patch.object(utils.socket, "gethostname", lambda: "osd001")
+    def test_get_named_key(self, mock_check_output):
+        mock_check_output.side_effect = [CalledProcessError(0, 0, 0), ""]
+        utils.get_named_key(name="rgw001")
+        mock_check_output.assert_has_calls([
+            call(['sudo', '-u', 'ceph', 'ceph', '--name',
+                  'mon.', '--keyring',
+                  '/var/lib/ceph/mon/ceph-osd001/keyring',
+                  'auth', 'get', 'client.rgw001']),
+            call(['sudo', '-u', 'ceph', 'ceph', '--name',
+                  'mon.', '--keyring',
+                  '/var/lib/ceph/mon/ceph-osd001/keyring',
+                  'auth', 'get-or-create', 'client.rgw001',
+                  'mon', 'allow r', 'osd',
+                  'allow rwx'])])
 
     def test_parse_key_with_caps_existing_key(self):
         expected = "AQCm7aVYQFXXFhAAj0WIeqcag88DKOvY4UKR/g=="
         with_caps = "[client.osd-upgrade]\n" \
                     "	key = AQCm7aVYQFXXFhAAj0WIeqcag88DKOvY4UKR/g==\n" \
                     "	caps mon = \"allow command \"config-key\";"
-        key = ceph.parse_key(with_caps)
-        print("key: {}".format(key))
+        key = utils.parse_key(with_caps)
         self.assertEqual(key, expected)
 
     def test_parse_key_without_caps(self):
         expected = "AQCm7aVYQFXXFhAAj0WIeqcag88DKOvY4UKR/g=="
         without_caps = "[client.osd-upgrade]\n" \
                        "	key = AQCm7aVYQFXXFhAAj0WIeqcag88DKOvY4UKR/g=="
-        key = ceph.parse_key(without_caps)
-        print("key: {}".format(key))
+        key = utils.parse_key(without_caps)
         self.assertEqual(key, expected)
 
     def test_list_unmounted_devices(self):
-        dev1 = mock.MagicMock(spec=TestDevice)
+        dev1 = MagicMock(spec=TestDevice)
         dev1.__getitem__.return_value = "block"
         dev1.device_node = '/dev/sda'
-        dev2 = mock.MagicMock(spec=TestDevice)
+        dev2 = MagicMock(spec=TestDevice)
         dev2.__getitem__.return_value = "block"
         dev2.device_node = '/dev/sdb'
-        dev3 = mock.MagicMock(spec=TestDevice)
+        dev3 = MagicMock(spec=TestDevice)
         dev3.__getitem__.return_value = "block"
         dev3.device_node = '/dev/loop1'
         devices = [dev1, dev2, dev3]
-        with mock.patch(
+        with patch(
                 'pyudev.Context.list_devices',
                 return_value=devices):
-            with mock.patch.object(ceph,
-                                   'is_device_mounted',
-                                   return_value=False):
-                devices = ceph.unmounted_disks()
+            with patch.object(utils, 'is_device_mounted',
+                              return_value=False):
+                devices = utils.unmounted_disks()
                 self.assertEqual(devices, ['/dev/sda', '/dev/sdb'])
-            with mock.patch.object(ceph,
-                                   'is_device_mounted',
-                                   return_value=True):
-                devices = ceph.unmounted_disks()
+            with patch.object(utils, 'is_device_mounted',
+                              return_value=True):
+                devices = utils.unmounted_disks()
                 self.assertEqual(devices, [])
 
-    @mock.patch.object(ceph, 'check_output')
+    @patch.object(utils.subprocess, 'check_output')
     def test_get_partition_list(self, output):
         with open('unit_tests/partx_output', 'r') as partx_out:
             output.return_value = partx_out.read()
-        partition_list = ceph.get_partition_list('/dev/xvdb')
+        partition_list = utils.get_partition_list('/dev/xvdb')
         self.assertEqual(len(partition_list), 2)
 
-    @mock.patch.object(ceph, 'check_output')
+    @patch.object(utils.subprocess, 'check_output')
     def test_get_ceph_pg_stat(self, output):
         """It returns the current PG stat"""
         output.return_value = """{
@@ -218,10 +211,10 @@ class CephTestCase(unittest.TestCase):
   "raw_bytes_avail": 26627104956416,
   "raw_bytes": 26982147686400
 }"""
-        pg_stat = ceph.get_ceph_pg_stat()
+        pg_stat = utils.get_ceph_pg_stat()
         self.assertEqual(pg_stat['num_pgs'], 320)
 
-    @mock.patch.object(ceph, 'check_output')
+    @patch.object(utils.subprocess, 'check_output')
     def test_get_ceph_health(self, output):
         """It gives the current Ceph health"""
         output.return_value = """{
@@ -310,39 +303,43 @@ class CephTestCase(unittest.TestCase):
   "overall_status": "HEALTH_OK",
   "detail": []
 }"""
-        health = ceph.get_ceph_health()
+        health = utils.get_ceph_health()
         self.assertEqual(health['overall_status'], "HEALTH_OK")
 
-    @mock.patch.object(subprocess, 'check_output')
+    @patch.object(utils.subprocess, 'check_output')
     def test_reweight_osd(self, mock_reweight):
         """It changes the weight of an OSD"""
         mock_reweight.return_value = "reweighted item id 0 name 'osd.0' to 1"
-        reweight_result = ceph.reweight_osd('0', '1')
+        reweight_result = utils.reweight_osd('0', '1')
         self.assertEqual(reweight_result, True)
         mock_reweight.assert_called_once_with(
             ['ceph', 'osd', 'crush', 'reweight', 'osd.0', '1'], stderr=-2)
 
-    @mock.patch.object(ceph, 'is_container')
+    @patch.object(utils, 'is_container')
     def test_determine_packages(self, mock_is_container):
         mock_is_container.return_value = False
-        self.assertTrue('ntp' in ceph.determine_packages())
-        self.assertEqual(ceph.PACKAGES, ceph.determine_packages())
+        self.assertTrue('ntp' in utils.determine_packages())
+        self.assertEqual(utils.PACKAGES,
+                         utils.determine_packages())
 
         mock_is_container.return_value = True
-        self.assertFalse('ntp' in ceph.determine_packages())
+        self.assertFalse('ntp' in utils.determine_packages())
 
-    @mock.patch.object(ceph, 'chownr')
-    @mock.patch.object(ceph, 'cmp_pkgrevno')
-    @mock.patch.object(ceph, 'ceph_user')
-    @mock.patch.object(ceph, 'os')
-    @mock.patch.object(ceph, 'systemd')
-    @mock.patch.object(ceph, 'log')
-    @mock.patch.object(ceph, 'mkdir')
-    @mock.patch.object(ceph, 'subprocess')
-    @mock.patch.object(ceph, 'service_restart')
+    @patch.object(utils, 'chownr')
+    @patch.object(utils, 'cmp_pkgrevno')
+    @patch.object(utils, 'ceph_user')
+    @patch.object(utils, 'os')
+    @patch.object(utils, 'systemd')
+    @patch.object(utils, 'log')
+    @patch.object(utils, 'mkdir')
+    @patch.object(utils.subprocess, 'check_output')
+    @patch.object(utils.subprocess, 'check_call')
+    @patch.object(utils, 'service_restart')
+    @patch.object(utils.socket, 'gethostname', lambda: 'TestHost')
     def _test_bootstrap_monitor_cluster(self,
                                         mock_service_restart,
-                                        mock_subprocess,
+                                        mock_check_call,
+                                        mock_check_output,
                                         mock_mkdir,
                                         mock_log,
                                         mock_systemd,
@@ -350,8 +347,8 @@ class CephTestCase(unittest.TestCase):
                                         mock_ceph_user,
                                         mock_cmp_pkgrevno,
                                         mock_chownr,
-                                        luminos=False):
-        test_hostname = ceph.socket.gethostname()
+                                        luminous=False):
+        test_hostname = utils.socket.gethostname()
         test_secret = 'mysecret'
         test_keyring = '/var/lib/ceph/tmp/{}.mon.keyring'.format(test_hostname)
         test_path = '/var/lib/ceph/mon/ceph-{}'.format(test_hostname)
@@ -360,62 +357,58 @@ class CephTestCase(unittest.TestCase):
 
         mock_os.path.exists.return_value = False
         mock_systemd.return_value = True
-        mock_cmp_pkgrevno.return_value = 1 if luminos else -1
+        mock_cmp_pkgrevno.return_value = 1 if luminous else -1
         mock_ceph_user.return_value = 'ceph'
 
         test_calls = [
-            mock.call(
+            call(
                 ['ceph-authtool', test_keyring,
                  '--create-keyring', '--name=mon.',
                  '--add-key={}'.format(test_secret),
                  '--cap', 'mon', 'allow *']
             ),
-            mock.call(
+            call(
                 ['ceph-mon', '--mkfs',
                  '-i', test_hostname,
                  '--keyring', test_keyring]
             ),
-            mock.call(['systemctl', 'enable', 'ceph-mon']),
+            call(['systemctl', 'enable', 'ceph-mon']),
         ]
-        if luminos:
+        if luminous:
             test_calls.append(
-                mock.call(['ceph-create-keys', '--id', test_hostname])
+                call(['ceph-create-keys', '--id', test_hostname])
             )
 
-        mock_open = mock.mock_open()
-        with mock.patch('ceph.open', mock_open, create=True):
-            ceph.bootstrap_monitor_cluster(test_secret)
+        fake_open = mock_open()
+        with patch('ceph.utils.open', fake_open, create=True):
+            utils.bootstrap_monitor_cluster(test_secret)
 
-        self.assertEqual(
-            mock_subprocess.check_call.mock_calls,
-            test_calls
-        )
+        mock_check_call.assert_has_calls(test_calls)
         mock_service_restart.assert_called_with('ceph-mon')
         mock_mkdir.assert_has_calls([
-            mock.call('/var/run/ceph', owner='ceph',
-                      group='ceph', perms=0o755),
-            mock.call(test_path, owner='ceph', group='ceph'),
+            call('/var/run/ceph', owner='ceph',
+                 group='ceph', perms=0o755),
+            call(test_path, owner='ceph', group='ceph'),
         ])
-        mock_open.assert_has_calls([
-            mock.call(test_done, 'w'),
-            mock.call(test_init_marker, 'w'),
-        ], any_order=True)
+        fake_open.assert_has_calls([call(test_done, 'w'),
+                                    call(test_init_marker, 'w')],
+                                   any_order=True)
         mock_os.unlink.assert_called_with(test_keyring)
 
     def test_bootstrap_monitor_cluster(self):
-        self._test_bootstrap_monitor_cluster(luminos=False)
+        self._test_bootstrap_monitor_cluster(luminous=False)
 
     def test_bootstrap_monitor_cluster_luminous(self):
-        self._test_bootstrap_monitor_cluster(luminos=True)
+        self._test_bootstrap_monitor_cluster(luminous=True)
 
-    @mock.patch.object(ceph, 'chownr')
-    @mock.patch.object(ceph, 'cmp_pkgrevno')
-    @mock.patch.object(ceph, 'ceph_user')
-    @mock.patch.object(ceph, 'os')
-    @mock.patch.object(ceph, 'log')
-    @mock.patch.object(ceph, 'mkdir')
-    @mock.patch.object(ceph, 'subprocess')
-    @mock.patch.object(ceph, 'service_restart')
+    @patch.object(utils, 'chownr')
+    @patch.object(utils, 'cmp_pkgrevno')
+    @patch.object(utils, 'ceph_user')
+    @patch.object(utils, 'os')
+    @patch.object(utils, 'log')
+    @patch.object(utils, 'mkdir')
+    @patch.object(utils, 'subprocess')
+    @patch.object(utils, 'service_restart')
     def test_bootstrap_manager(self,
                                mock_service_restart,
                                mock_subprocess,
@@ -425,7 +418,7 @@ class CephTestCase(unittest.TestCase):
                                mock_ceph_user,
                                mock_cmp_pkgrevno,
                                mock_chownr):
-        test_hostname = ceph.socket.gethostname()
+        test_hostname = utils.socket.gethostname()
         test_path = '/var/lib/ceph/mgr/ceph-{}'.format(test_hostname)
         test_keyring = '/var/lib/ceph/mgr/ceph-{}/keyring'.format(
             test_hostname)
@@ -436,19 +429,19 @@ class CephTestCase(unittest.TestCase):
         mock_ceph_user.return_value = 'ceph'
 
         test_calls = [
-            mock.call(
+            call(
                 ['ceph', 'auth', 'get-or-create',
                  'mgr.{}'.format(test_hostname), 'mon',
                  'allow profile mgr', 'osd', 'allow *',
                  'mds', 'allow *', '--out-file',
                  test_keyring]
             ),
-            mock.call(['systemctl', 'enable', test_unit]),
+            call(['systemctl', 'enable', test_unit]),
         ]
 
-        mock_open = mock.mock_open()
-        with mock.patch('ceph.open', mock_open, create=True):
-            ceph.bootstrap_manager()
+        fake_open = mock_open()
+        with patch('ceph.open', fake_open, create=True):
+            utils.bootstrap_manager()
 
         self.assertEqual(
             mock_subprocess.check_call.mock_calls,
@@ -456,22 +449,28 @@ class CephTestCase(unittest.TestCase):
         )
         mock_service_restart.assert_called_with(test_unit)
         mock_mkdir.assert_has_calls([
-            mock.call(test_path, owner='ceph', group='ceph'),
+            call(test_path, owner='ceph', group='ceph'),
         ])
 
 
 class CephVersionTestCase(unittest.TestCase):
-    @mock.patch.object(ceph, 'get_os_codename_install_source')
+    @patch.object(utils, 'get_os_codename_install_source')
     def test_resolve_ceph_version_trusty(self, get_os_codename_install_source):
         get_os_codename_install_source.return_value = 'juno'
-        self.assertEqual(ceph.resolve_ceph_version('cloud:trusty-juno'),
+        self.assertEqual(utils.resolve_ceph_version('cloud:trusty-juno'),
                          'firefly')
         get_os_codename_install_source.return_value = 'kilo'
-        self.assertEqual(ceph.resolve_ceph_version('cloud:trusty-kilo'),
+        self.assertEqual(utils.resolve_ceph_version('cloud:trusty-kilo'),
                          'hammer')
         get_os_codename_install_source.return_value = 'liberty'
-        self.assertEqual(ceph.resolve_ceph_version('cloud:trusty-liberty'),
-                         'hammer')
+        self.assertEqual(utils.resolve_ceph_version(
+                         'cloud:trusty-liberty'), 'hammer')
         get_os_codename_install_source.return_value = 'mitaka'
-        self.assertEqual(ceph.resolve_ceph_version('cloud:trusty-mitaka'),
-                         'jewel')
+        self.assertEqual(utils.resolve_ceph_version(
+                         'cloud:trusty-mitaka'), 'jewel')
+        get_os_codename_install_source.return_value = 'newton'
+        self.assertEqual(utils.resolve_ceph_version(
+                         'cloud:xenial-newton'), 'jewel')
+        get_os_codename_install_source.return_value = 'ocata'
+        self.assertEqual(utils.resolve_ceph_version(
+                         'cloud:xenial-ocata'), 'jewel')
