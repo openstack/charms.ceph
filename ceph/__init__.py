@@ -1314,6 +1314,27 @@ def bootstrap_monitor_cluster(secret):
             os.unlink(keyring)
 
 
+def bootstrap_manager():
+    hostname = socket.gethostname()
+    path = '/var/lib/ceph/mgr/ceph-{}'.format(hostname)
+    keyring = os.path.join(path, 'keyring')
+
+    if os.path.exists(keyring):
+        log('bootstrap_manager: mgr already initialized.')
+    else:
+        mkdir(path, owner=ceph_user(), group=ceph_user())
+        subprocess.check_call(['ceph', 'auth', 'get-or-create',
+                               'mgr.{}'.format(hostname), 'mon',
+                               'allow profile mgr', 'osd', 'allow *',
+                               'mds', 'allow *', '--out-file',
+                               keyring])
+        chownr(path, ceph_user(), ceph_user())
+
+        unit = 'ceph-mgr@{}'.format(hostname)
+        subprocess.check_call(['systemctl', 'enable', unit])
+        service_restart(unit)
+
+
 def update_monfs():
     hostname = socket.gethostname()
     monfs = '/var/lib/ceph/mon/ceph-{}'.format(hostname)

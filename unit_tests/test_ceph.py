@@ -408,6 +408,57 @@ class CephTestCase(unittest.TestCase):
     def test_bootstrap_monitor_cluster_luminous(self):
         self._test_bootstrap_monitor_cluster(luminos=True)
 
+    @mock.patch.object(ceph, 'chownr')
+    @mock.patch.object(ceph, 'cmp_pkgrevno')
+    @mock.patch.object(ceph, 'ceph_user')
+    @mock.patch.object(ceph, 'os')
+    @mock.patch.object(ceph, 'log')
+    @mock.patch.object(ceph, 'mkdir')
+    @mock.patch.object(ceph, 'subprocess')
+    @mock.patch.object(ceph, 'service_restart')
+    def test_bootstrap_manager(self,
+                               mock_service_restart,
+                               mock_subprocess,
+                               mock_mkdir,
+                               mock_log,
+                               mock_os,
+                               mock_ceph_user,
+                               mock_cmp_pkgrevno,
+                               mock_chownr):
+        test_hostname = ceph.socket.gethostname()
+        test_path = '/var/lib/ceph/mgr/ceph-{}'.format(test_hostname)
+        test_keyring = '/var/lib/ceph/mgr/ceph-{}/keyring'.format(
+            test_hostname)
+        test_unit = 'ceph-mgr@{}'.format(test_hostname)
+
+        mock_os.path.exists.return_value = False
+        mock_os.path.join.return_value = test_keyring
+        mock_ceph_user.return_value = 'ceph'
+
+        test_calls = [
+            mock.call(
+                ['ceph', 'auth', 'get-or-create',
+                 'mgr.{}'.format(test_hostname), 'mon',
+                 'allow profile mgr', 'osd', 'allow *',
+                 'mds', 'allow *', '--out-file',
+                 test_keyring]
+            ),
+            mock.call(['systemctl', 'enable', test_unit]),
+        ]
+
+        mock_open = mock.mock_open()
+        with mock.patch('ceph.open', mock_open, create=True):
+            ceph.bootstrap_manager()
+
+        self.assertEqual(
+            mock_subprocess.check_call.mock_calls,
+            test_calls
+        )
+        mock_service_restart.assert_called_with(test_unit)
+        mock_mkdir.assert_has_calls([
+            mock.call(test_path, owner='ceph', group='ceph'),
+        ])
+
 
 class CephVersionTestCase(unittest.TestCase):
     @mock.patch.object(ceph, 'get_os_codename_install_source')
