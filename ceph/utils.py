@@ -1405,6 +1405,8 @@ def osdize_dev(dev, osd_format, osd_journal, reformat_osd=False,
         # NOTE(jamespage): enable experimental bluestore support
         if cmp_pkgrevno('ceph', '10.2.0') >= 0 and bluestore:
             cmd.append('--bluestore')
+        elif cmp_pkgrevno('ceph', '12.1.0') >= 0 and not bluestore:
+            cmd.append('--filestore')
 
         cmd.append(dev)
 
