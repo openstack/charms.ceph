@@ -2063,6 +2063,7 @@ def dirs_need_ownership_update(service):
 UPGRADE_PATHS = {
     'firefly': 'hammer',
     'hammer': 'jewel',
+    'jewel': 'luminous',
 }
 
 # Map UCA codenames to ceph codenames
@@ -2074,6 +2075,8 @@ UCA_CODENAME_MAP = {
     'mitaka': 'jewel',
     'newton': 'jewel',
     'ocata': 'jewel',
+    'pike': 'luminous',
+    'queens': 'luminous',
 }
 
 
