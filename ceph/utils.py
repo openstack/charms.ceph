@@ -1355,8 +1355,17 @@ def get_partitions(dev):
         return []
 
 
-def find_least_used_journal(journal_devices):
-    usages = map(lambda a: (len(get_partitions(a)), a), journal_devices)
+def find_least_used_utility_device(utility_devices):
+    """
+    Find a utility device which has the smallest number of partitions
+    among other devices in the supplied list.
+
+    :utility_devices: A list of devices to be used for filestore journal
+    or bluestore wal or db.
+    :return: string device name
+    """
+
+    usages = map(lambda a: (len(get_partitions(a)), a), utility_devices)
     least = min(usages, key=lambda t: t[0])
     return least[1]
 
@@ -1427,18 +1436,20 @@ def osdize_dev(dev, osd_format, osd_journal, reformat_osd=False,
             wal = get_devices('bluestore-wal')
             if wal:
                 cmd.append('--block.wal')
-                cmd.append(wal)
+                least_used_wal = find_least_used_utility_device(wal)
+                cmd.append(least_used_wal)
             db = get_devices('bluestore-db')
             if db:
                 cmd.append('--block.db')
-                cmd.append(db)
+                least_used_db = find_least_used_utility_device(db)
+                cmd.append(least_used_db)
         elif cmp_pkgrevno('ceph', '12.1.0') >= 0 and not bluestore:
             cmd.append('--filestore')
 
         cmd.append(dev)
 
         if osd_journal:
-            least_used = find_least_used_journal(osd_journal)
+            least_used = find_least_used_utility_device(osd_journal)
             cmd.append(least_used)
     else:
         # Just provide the device - no other options
