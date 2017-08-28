@@ -46,6 +46,41 @@ class CephTestCase(unittest.TestCase):
     def setUp(self):
         super(CephTestCase, self).setUp()
 
+    @patch.object(utils.subprocess, 'check_call')
+    @patch.object(utils.os.path, 'exists')
+    @patch.object(utils, 'is_device_mounted')
+    @patch.object(utils, 'cmp_pkgrevno')
+    @patch.object(utils, 'is_block_device')
+    def test_osdize_dev(self, _is_blk, _cmp, _mounted, _exists, _call):
+        """Test that the dev osd is initialized correctly"""
+        _is_blk.return_value = True
+        _mounted.return_value = False
+        _exists.return_value = True
+        _cmp.return_value = True
+        utils.osdize('/dev/sdb', osd_format='xfs', osd_journal=None,
+                     reformat_osd=True, bluestore=False)
+        _call.assert_called_with(['ceph-disk', 'prepare', '--fs-type', 'xfs',
+                                  '--zap-disk', '--filestore', '/dev/sdb'])
+
+    @patch.object(utils.subprocess, 'check_call')
+    @patch.object(utils.os.path, 'exists')
+    @patch.object(utils, 'is_device_mounted')
+    @patch.object(utils, 'cmp_pkgrevno')
+    @patch.object(utils, 'mkdir')
+    @patch.object(utils, 'chownr')
+    @patch.object(utils, 'ceph_user')
+    def test_osdize_dir(self, _ceph_user, _chown, _mkdir,
+                        _cmp, _mounted, _exists, _call):
+        """Test that the dev osd is initialized correctly"""
+        _ceph_user.return_value = "ceph"
+        _mounted.return_value = False
+        _exists.return_value = False
+        _cmp.return_value = True
+        utils.osdize('/srv/osd', osd_format='xfs', osd_journal=None,
+                     bluestore=False)
+        _call.assert_called_with(['sudo', '-u', 'ceph', 'ceph-disk', 'prepare',
+                                  '--data-dir', '/srv/osd', '--filestore'])
+
     @patch.object(utils.subprocess, 'check_output')
     def test_get_osd_weight(self, output):
         """It gives an OSD's weight"""
