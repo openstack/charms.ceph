@@ -30,6 +30,7 @@ from datetime import datetime
 
 from charmhelpers.core import hookenv
 from charmhelpers.core import templating
+from charmhelpers.core.decorators import retry_on_exception
 from charmhelpers.core.host import (
     chownr,
     cmp_pkgrevno,
@@ -1287,38 +1288,51 @@ def bootstrap_monitor_cluster(secret):
         mkdir(path, owner=ceph_user(), group=ceph_user())
         # end changes for Ceph >= 0.61.3
         try:
-            subprocess.check_call(['ceph-authtool', keyring,
-                                   '--create-keyring', '--name=mon.',
-                                   '--add-key={}'.format(secret),
-                                   '--cap', 'mon', 'allow *'])
+            add_keyring_to_ceph(keyring,
+                                secret,
+                                hostname,
+                                path,
+                                done,
+                                init_marker)
 
-            subprocess.check_call(['ceph-mon', '--mkfs',
-                                   '-i', hostname,
-                                   '--keyring', keyring])
-            chownr(path, ceph_user(), ceph_user())
-            with open(done, 'w'):
-                pass
-            with open(init_marker, 'w'):
-                pass
-
-            if systemd():
-                subprocess.check_call(['systemctl', 'enable', 'ceph-mon'])
-                service_restart('ceph-mon')
-            else:
-                service_restart('ceph-mon-all')
-
-            if cmp_pkgrevno('ceph', '12.0.0') >= 0:
-                # NOTE(jamespage): Later ceph releases require explicit
-                #                  call to ceph-create-keys to setup the
-                #                  admin keys for the cluster; this command
-                #                  will wait for quorum in the cluster before
-                #                  returning.
-                cmd = ['ceph-create-keys', '--id', hostname]
-                subprocess.check_call(cmd)
         except:
             raise
         finally:
             os.unlink(keyring)
+
+
+@retry_on_exception(3, base_delay=5)
+def add_keyring_to_ceph(keyring, secret, hostname, path, done, init_marker):
+    subprocess.check_call(['ceph-authtool', keyring,
+                           '--create-keyring', '--name=mon.',
+                           '--add-key={}'.format(secret),
+                           '--cap', 'mon', 'allow *'])
+    subprocess.check_call(['ceph-mon', '--mkfs',
+                           '-i', hostname,
+                           '--keyring', keyring])
+    chownr(path, ceph_user(), ceph_user())
+    with open(done, 'w'):
+        pass
+    with open(init_marker, 'w'):
+        pass
+
+    if systemd():
+        subprocess.check_call(['systemctl', 'enable', 'ceph-mon'])
+        service_restart('ceph-mon')
+    else:
+        service_restart('ceph-mon-all')
+
+    if cmp_pkgrevno('ceph', '12.0.0') >= 0:
+        # NOTE(jamespage): Later ceph releases require explicit
+        #                  call to ceph-create-keys to setup the
+        #                  admin keys for the cluster; this command
+        #                  will wait for quorum in the cluster before
+        #                  returning.
+        cmd = ['ceph-create-keys', '--id', hostname]
+        subprocess.check_call(cmd)
+    osstat = os.stat("/etc/ceph/ceph.client.admin.keyring")
+    if not osstat.st_size:
+        raise Exception
 
 
 def update_monfs():
