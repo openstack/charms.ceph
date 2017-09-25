@@ -51,6 +51,8 @@ from charmhelpers.core.hookenv import (
     DEBUG,
     ERROR,
     WARNING,
+    storage_get,
+    storage_list,
 )
 from charmhelpers.fetch import (
     apt_cache,
@@ -1359,6 +1361,23 @@ def find_least_used_journal(journal_devices):
     return least[1]
 
 
+def get_devices(name):
+    """ Merge config and juju storage based devices
+
+    :name: THe name of the device type, eg: wal, osd, journal
+    :returns: Set(device names), which are strings
+    """
+    if config(name):
+        devices = [l.strip() for l in config(name).split(' ')]
+    else:
+        devices = []
+    storage_ids = storage_list(name)
+    devices.extend((storage_get('location', s) for s in storage_ids))
+    devices = filter(os.path.exists, devices)
+
+    return set(devices)
+
+
 def osdize(dev, osd_format, osd_journal, reformat_osd=False,
            ignore_errors=False, encrypt=False, bluestore=False):
     if dev.startswith('/dev'):
@@ -1405,6 +1424,14 @@ def osdize_dev(dev, osd_format, osd_journal, reformat_osd=False,
         # NOTE(jamespage): enable experimental bluestore support
         if cmp_pkgrevno('ceph', '10.2.0') >= 0 and bluestore:
             cmd.append('--bluestore')
+            wal = get_devices('bluestore-wal')
+            if wal:
+                cmd.append('--block.wal')
+                cmd.append(wal)
+            db = get_devices('bluestore-db')
+            if db:
+                cmd.append('--block.db')
+                cmd.append(db)
         elif cmp_pkgrevno('ceph', '12.1.0') >= 0 and not bluestore:
             cmd.append('--filestore')
 
