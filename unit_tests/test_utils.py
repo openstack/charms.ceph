@@ -487,6 +487,25 @@ class CephTestCase(unittest.TestCase):
             call(test_path, owner='ceph', group='ceph'),
         ])
 
+    @patch.object(utils.subprocess, 'check_call')
+    def test_osd_set_noout(self, mock_check_call):
+        """It changes the setting of ceph osd noout"""
+        utils.osd_noout(True)
+        mock_check_call.assert_called_once_with(
+            ['ceph', '--id', 'admin', 'osd', 'set', 'noout'])
+
+    @patch.object(utils.subprocess, 'check_call')
+    def test_osd_unset_noout(self, mock_check_call):
+        utils.osd_noout(False)
+        mock_check_call.assert_called_once_with(
+            ['ceph', '--id', 'admin', 'osd', 'unset', 'noout'])
+
+    @patch.object(utils.subprocess, 'check_call')
+    def test_osd_set_noout_fail(self, mock_check_call):
+        mock_check_call.side_effect = CalledProcessError
+        with self.assertRaises(Exception):
+            utils.osd_noout(True)
+
 
 class CephVersionTestCase(unittest.TestCase):
     @patch.object(utils, 'get_os_codename_install_source')

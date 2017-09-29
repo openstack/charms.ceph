@@ -2282,3 +2282,25 @@ def bootstrap_manager():
         unit = 'ceph-mgr@{}'.format(hostname)
         subprocess.check_call(['systemctl', 'enable', unit])
         service_restart(unit)
+
+
+def osd_noout(enable):
+    """Sets or unsets 'noout'
+
+    :param enable: bool. True to set noout, False to unset.
+    :returns: bool. True if output looks right.
+    :raises CalledProcessError: if an error occurs invoking the systemd cmd
+    """
+    operation = {
+        True: 'set',
+        False: 'unset',
+    }
+    try:
+        subprocess.check_call(['ceph', '--id', 'admin',
+                               'osd', operation[enable],
+                               'noout'])
+        log('running ceph osd {} noout'.format(operation[enable]))
+        return True
+    except subprocess.CalledProcessError as e:
+        log(e)
+        raise
