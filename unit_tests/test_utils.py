@@ -84,7 +84,7 @@ class CephTestCase(unittest.TestCase):
     @patch.object(utils.subprocess, 'check_output')
     def test_get_osd_weight(self, output):
         """It gives an OSD's weight"""
-        output.return_value = """{
+        output.return_value = b"""{
     "nodes": [{
         "id": -1,
         "name": "default",
@@ -152,7 +152,7 @@ class CephTestCase(unittest.TestCase):
     @patch.object(utils, "ceph_user", lambda: "ceph")
     @patch.object(utils.socket, "gethostname", lambda: "osd001")
     def test_get_named_key_with_pool(self, mock_check_output):
-        mock_check_output.side_effect = [CalledProcessError(0, 0, 0), ""]
+        mock_check_output.side_effect = [CalledProcessError(0, 0, 0), b""]
         utils.get_named_key(name="rgw001", pool_list=["rbd", "block"])
         mock_check_output.assert_has_calls([
             call(['sudo', '-u', 'ceph', 'ceph', '--name',
@@ -170,7 +170,7 @@ class CephTestCase(unittest.TestCase):
     @patch.object(utils, 'ceph_user', lambda: "ceph")
     @patch.object(utils.socket, "gethostname", lambda: "osd001")
     def test_get_named_key(self, mock_check_output):
-        mock_check_output.side_effect = [CalledProcessError(0, 0, 0), ""]
+        mock_check_output.side_effect = [CalledProcessError(0, 0, 0), b""]
         utils.get_named_key(name="rgw001")
         mock_check_output.assert_has_calls([
             call(['sudo', '-u', 'ceph', 'ceph', '--name',
@@ -225,14 +225,14 @@ class CephTestCase(unittest.TestCase):
     @patch.object(utils.subprocess, 'check_output')
     def test_get_partition_list(self, output):
         with open('unit_tests/partx_output', 'r') as partx_out:
-            output.return_value = partx_out.read()
+            output.return_value = partx_out.read().encode('UTF-8')
         partition_list = utils.get_partition_list('/dev/xvdb')
         self.assertEqual(len(partition_list), 2)
 
     @patch.object(utils.subprocess, 'check_output')
     def test_get_ceph_pg_stat(self, output):
         """It returns the current PG stat"""
-        output.return_value = """{
+        output.return_value = b"""{
   "num_pg_by_state": [
     {
       "name": "active+clean",
@@ -252,7 +252,7 @@ class CephTestCase(unittest.TestCase):
     @patch.object(utils.subprocess, 'check_output')
     def test_get_ceph_health(self, output):
         """It gives the current Ceph health"""
-        output.return_value = """{
+        output.return_value = b"""{
   "health": {
     "health_services": [
       {
@@ -344,7 +344,7 @@ class CephTestCase(unittest.TestCase):
     @patch.object(utils.subprocess, 'check_output')
     def test_reweight_osd(self, mock_reweight):
         """It changes the weight of an OSD"""
-        mock_reweight.return_value = "reweighted item id 0 name 'osd.0' to 1"
+        mock_reweight.return_value = b"reweighted item id 0 name 'osd.0' to 1"
         reweight_result = utils.reweight_osd('0', '1')
         self.assertEqual(reweight_result, True)
         mock_reweight.assert_called_once_with(
