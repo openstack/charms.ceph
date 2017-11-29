@@ -227,7 +227,7 @@ class CephTestCase(unittest.TestCase):
         with open('unit_tests/partx_output', 'r') as partx_out:
             output.return_value = partx_out.read().encode('UTF-8')
         partition_list = utils.get_partition_list('/dev/xvdb')
-        self.assertEqual(len(partition_list), 2)
+        self.assertEqual(len(partition_list), 4)
 
     @patch.object(utils.subprocess, 'check_output')
     def test_get_ceph_pg_stat(self, output):

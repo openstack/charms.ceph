@@ -944,15 +944,27 @@ def get_partition_list(dev):
         # For each line of output
         for partition in partitions:
             parts = partition.split()
-            partitions_list.append(
-                Partition(number=parts[0],
-                          start=parts[1],
-                          end=parts[2],
-                          sectors=parts[3],
-                          size=parts[4],
-                          name=parts[5],
-                          uuid=parts[6])
-            )
+            try:
+                partitions_list.append(
+                    Partition(number=parts[0],
+                              start=parts[1],
+                              end=parts[2],
+                              sectors=parts[3],
+                              size=parts[4],
+                              name=parts[5],
+                              uuid=parts[6])
+                )
+            except IndexError:
+                partitions_list.append(
+                    Partition(number=parts[0],
+                              start=parts[1],
+                              end=parts[2],
+                              sectors=parts[3],
+                              size=parts[4],
+                              name="",
+                              uuid=parts[5])
+                )
+
         return partitions_list
     except subprocess.CalledProcessError:
         raise
