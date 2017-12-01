@@ -2171,7 +2171,7 @@ UCA_CODENAME_MAP = {
 def pretty_print_upgrade_paths():
     """Pretty print supported upgrade paths for ceph"""
     return ["{} -> {}".format(key, value)
-            for key, value in UPGRADE_PATHS.iteritems()]
+            for key, value in UPGRADE_PATHS.items()]
 
 
 def resolve_ceph_version(source):

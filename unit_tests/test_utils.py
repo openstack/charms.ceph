@@ -506,6 +506,11 @@ class CephTestCase(unittest.TestCase):
         with self.assertRaises(Exception):
             utils.osd_noout(True)
 
+    def test_pretty_print_upgrade_paths(self):
+        expected = (['firefly -> hammer', 'jewel -> luminous',
+                     'hammer -> jewel'])
+        self.assertEqual(utils.pretty_print_upgrade_paths(), expected)
+
 
 class CephVersionTestCase(unittest.TestCase):
     @patch.object(utils, 'get_os_codename_install_source')
