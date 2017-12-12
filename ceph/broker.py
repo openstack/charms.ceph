@@ -187,6 +187,9 @@ def handle_add_permissions_to_key(request, service):
     group = get_group(group_name=group_name)
     service_obj = get_service_groups(service=service_name,
                                      namespace=group_namespace)
+    if request.get('object-prefix-permissions'):
+        service_obj['object_prefix_perms'] = request.get(
+            'object-prefix-permissions')
     format("Service object: {}".format(service_obj))
     permission = request.get('group-permission') or "rwx"
     if service_name not in group['services']:
@@ -241,8 +244,13 @@ def pool_permission_list_for_service(service):
     for permission, groups in permission_types.items():
         permission = "allow {}".format(permission)
         for group in groups:
-            for pool in service['groups'][group]['pools']:
+            for pool in service['groups'][group].get('pools', []):
                 permissions.append("{} pool={}".format(permission, pool))
+    for permission, prefixes in sorted(
+            service.get("object_prefix_perms", {}).items()):
+        for prefix in prefixes:
+            permissions.append("allow {} object_prefix {}".format(permission,
+                                                                  prefix))
     return ["mon", "allow r", "osd", ', '.join(permissions)]
 
 

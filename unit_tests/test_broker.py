@@ -531,3 +531,101 @@ class CephBrokerTestCase(unittest.TestCase):
             expect_service_name,
             expect_service_obj,
             expect_group_namespace)
+
+    @patch.object(ceph.broker, 'save_service')
+    @patch.object(ceph.broker, 'save_group')
+    @patch.object(ceph.broker, 'monitor_key_get')
+    @patch.object(ceph.broker, 'update_service_permissions')
+    def test_handle_add_permissions_to_key_obj_prefs(self,
+                                                     mock_update_serv_perms,
+                                                     mock_monitor_key_get,
+                                                     mock_save_group,
+                                                     mock_save_service):
+        mkey = {
+            'cephx.services.glance': ('{"groups": {}, "group_names": '
+                                      '{"rwx": ["images"]}}'),
+            'cephx.groups.images': ('{"services": ["glance", "cinder-ceph", '
+                                    '"nova-compute"], "pools": ["glance"]}')}
+        mock_monitor_key_get.side_effect = lambda service, key: mkey[key]
+        expect_service_name = u'glance'
+        expected_group = {
+            u'services': [
+                u'glance',
+                u'cinder-ceph',
+                u'nova-compute'],
+            u'pools': [u'glance']}
+        expect_service_obj = {
+            u'groups': {
+                u'images': expected_group},
+            u'group_names': {
+                u'rwx': [u'images']},
+            u'object_prefix_perms': {
+                u'rwx': [u'rbd_children'], u'r': ['another']}}
+        expect_group_namespace = None
+        ceph.broker.handle_add_permissions_to_key(
+            request={
+                u'namespace': None,
+                u'group-permission': u'rwx',
+                u'group': u'images',
+                u'name': u'glance',
+                u'object-prefix-permissions': {
+                    u'rwx': [u'rbd_children'], u'r': ['another']},
+                u'op': u'add-permissions-to-key'},
+            service='admin')
+        mock_save_group.assert_called_once_with(
+            group=expected_group,
+            group_name='images')
+        mock_save_service.assert_called_once_with(
+            service=expect_service_obj,
+            service_name=expect_service_name)
+        mock_update_serv_perms.assert_called_once_with(
+            expect_service_name,
+            expect_service_obj,
+            expect_group_namespace)
+
+    def test_pool_permission_list_for_service_obj_pref(self):
+        expected_group = {
+            u'services': [
+                u'glance',
+                u'cinder-ceph',
+                u'nova-compute'],
+            u'pools': [u'glance']}
+        expect_service_obj = {
+            u'groups': {
+                u'images': expected_group},
+            u'group_names': {
+                u'rwx': [u'images']},
+            u'object_prefix_perms': {
+                u'rwx': [u'rbd_children'], u'r': ['another']}}
+        self.assertEqual(ceph.broker.pool_permission_list_for_service(
+            expect_service_obj),
+            [
+                'mon',
+                'allow r',
+                'osd',
+                ('allow rwx pool=glance, '
+                 'allow r object_prefix another, '
+                 'allow rwx object_prefix rbd_children')])
+
+    def test_pool_permission_list_for_glance(self):
+        expected_group = {
+            u'services': [
+                u'glance',
+                u'cinder-ceph',
+                u'nova-compute'],
+            u'pools': [u'glance']}
+        expect_service_obj = {
+            u'groups': {
+                u'images': expected_group},
+            u'group_names': {
+                u'rwx': [u'images']},
+            u'object_prefix_perms': {
+                u'class-read': [u'rbd_children']}}
+        self.assertEqual(ceph.broker.pool_permission_list_for_service(
+            expect_service_obj),
+            [
+                'mon',
+                'allow r',
+                'osd',
+                ('allow rwx pool=glance, '
+                 'allow class-read object_prefix rbd_children')])
