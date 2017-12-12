@@ -111,6 +111,29 @@ class CephBrokerTestCase(unittest.TestCase):
                                   'osd',
                                   'allow rwx pool=glance'])
 
+    def test_pool_permission_list_for_service_multi(self):
+        service = {
+            'group_names': {'rwx': ['images', 'group1'], 'r': ['group2']},
+            'groups': {
+                'images': {
+                    'pools': ['glance'],
+                    'services': ['nova']},
+                'group1': {
+                    'pools': ['p1'],
+                    'services': ['svc1']},
+                'group2': {
+                    'pools': ['p2'],
+                    'services': ['svc2']}}
+        }
+        result = ceph.broker.pool_permission_list_for_service(service)
+        self.assertEqual(
+            result,
+            [
+                'mon',
+                'allow r',
+                'osd',
+                'allow r pool=p2, allow rwx pool=glance, allow rwx pool=p1'])
+
     @patch.object(ceph.broker, 'monitor_key_set')
     def test_save_service(self, _monitor_key_set):
         service = {
@@ -383,3 +406,128 @@ class CephBrokerTestCase(unittest.TestCase):
         self.assertEqual(json.loads(rc)['stderr'],
                          "Missing or invalid api version (0)")
         self.assertEqual(json.loads(rc)['request-id'], '1ef5aede')
+
+    @patch.object(ceph.broker, 'handle_add_permissions_to_key')
+    @patch.object(ceph.broker, 'log')
+    def test_process_requests_add_perms(self, mock_log,
+                                        mock_handle_add_permissions_to_key):
+        request = {
+            "api-version": 1,
+            "request-id": "0155c14b",
+            "ops": [
+                {
+                    "namespace": None,
+                    "group-permission": "rwx",
+                    "group": "images",
+                    "name": "glance",
+                    "op": "add-permissions-to-key"
+                }
+            ]
+        }
+        reqs = json.dumps(request)
+        rc = ceph.broker.process_requests(reqs)
+        mock_handle_add_permissions_to_key.assert_called_once_with(
+            request={
+                u'namespace': None,
+                u'group-permission': u'rwx',
+                u'group': u'images',
+                u'name': u'glance',
+                u'op': u'add-permissions-to-key'},
+            service='admin')
+        self.assertEqual(
+            json.loads(rc),
+            {'exit-code': 0, u'request-id': u'0155c14b'})
+
+    @patch.object(ceph.broker, 'handle_add_permissions_to_key')
+    @patch.object(ceph.broker, 'log')
+    def test_process_requests_add_multi_perms(self, mock_log,
+                                              mock_handle_add_perms_to_key):
+        request = {
+            "api-version": 1,
+            "request-id": "0155c14b",
+            "ops": [
+                {
+                    "namespace": None,
+                    "group-permission": "rwx",
+                    "group": "images",
+                    "name": "glance",
+                    "op": "add-permissions-to-key"
+                },
+                {
+                    "namespace": None,
+                    "group-permission": "r",
+                    "group": "volumes",
+                    "name": "cinder",
+                    "op": "add-permissions-to-key"
+                }
+            ]
+        }
+        reqs = json.dumps(request)
+        rc = ceph.broker.process_requests(reqs)
+        call1 = call(
+            request={
+                u'namespace': None,
+                u'group-permission': u'rwx',
+                u'group': u'images',
+                u'name': u'glance',
+                u'op': u'add-permissions-to-key'},
+            service='admin')
+        call2 = call(
+            request={
+                u'namespace': None,
+                u'group-permission': u'r',
+                u'group': u'volumes',
+                u'name': u'cinder',
+                u'op': u'add-permissions-to-key'},
+            service='admin')
+        mock_handle_add_perms_to_key.assert_has_calls([call1, call2])
+        self.assertEqual(
+            json.loads(rc),
+            {'exit-code': 0, u'request-id': u'0155c14b'})
+
+    @patch.object(ceph.broker, 'save_service')
+    @patch.object(ceph.broker, 'save_group')
+    @patch.object(ceph.broker, 'monitor_key_get')
+    @patch.object(ceph.broker, 'update_service_permissions')
+    def test_handle_add_permissions_to_key(self,
+                                           mock_update_service_permissions,
+                                           mock_monitor_key_get,
+                                           mock_save_group,
+                                           mock_save_service):
+        mkey = {
+            'cephx.services.glance': ('{"groups": {}, '
+                                      '"group_names": {"rwx": ["images"]}}'),
+            'cephx.groups.images': ('{"services": ["glance", "cinder-ceph", '
+                                    '"nova-compute"], "pools": ["glance"]}')}
+        mock_monitor_key_get.side_effect = lambda service, key: mkey[key]
+        expect_service_name = u'glance'
+        expected_group = {
+            u'services': [
+                u'glance',
+                u'cinder-ceph',
+                u'nova-compute'],
+            u'pools': [u'glance']}
+        expect_service_obj = {
+            u'groups': {
+                u'images': expected_group},
+            u'group_names': {
+                u'rwx': [u'images']}}
+        expect_group_namespace = None
+        ceph.broker.handle_add_permissions_to_key(
+            request={
+                u'namespace': None,
+                u'group-permission': u'rwx',
+                u'group': u'images',
+                u'name': u'glance',
+                u'op': u'add-permissions-to-key'},
+            service='admin')
+        mock_save_group.assert_called_once_with(
+            group=expected_group,
+            group_name='images')
+        mock_save_service.assert_called_once_with(
+            service=expect_service_obj,
+            service_name=expect_service_name)
+        mock_update_service_permissions.assert_called_once_with(
+            expect_service_name,
+            expect_service_obj,
+            expect_group_namespace)

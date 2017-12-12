@@ -233,7 +233,7 @@ def pool_permission_list_for_service(service):
     """Build the permission string for Ceph for a given service"""
     permissions = []
     permission_types = collections.OrderedDict()
-    for permission, group in service["group_names"].items():
+    for permission, group in sorted(service["group_names"].items()):
         if permission not in permission_types:
             permission_types[permission] = []
         for item in group:
