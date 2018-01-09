@@ -147,6 +147,52 @@ class UpgradeRollingTestCase(unittest.TestCase):
             ]
         )
 
+    @patch.object(ceph.utils, 'service_restart')
+    @patch.object(ceph.utils, '_upgrade_single_osd')
+    @patch.object(ceph.utils, 'update_owner')
+    @patch('os.listdir')
+    @patch.object(ceph.utils, '_get_child_dirs')
+    @patch.object(ceph.utils, 'dirs_need_ownership_update')
+    @patch.object(ceph.utils, 'apt_install')
+    @patch.object(ceph.utils, 'log')
+    @patch.object(ceph.utils, 'status_set')
+    @patch.object(ceph.utils, 'apt_update')
+    @patch.object(ceph.utils, 'add_source')
+    @patch.object(ceph.utils, 'get_local_osd_ids')
+    @patch.object(ceph.utils, 'systemd')
+    @patch.object(ceph.utils, 'get_version')
+    @patch.object(ceph.utils, 'config')
+    def test_upgrade_osd_luminous(self, config, get_version, systemd,
+                                  local_osds, add_source, apt_update,
+                                  status_set,
+                                  log,
+                                  apt_install,
+                                  dirs_need_ownership_update,
+                                  _get_child_dirs, listdir, update_owner,
+                                  _upgrade_single_osd, service_restart):
+        config.side_effect = config_side_effect
+        get_version.side_effect = [10.2, 12.2]
+        systemd.return_value = True
+        local_osds.return_value = [0, 1, 2]
+        listdir.return_value = ['osd', 'mon', 'fs']
+        _get_child_dirs.return_value = ['ceph-0', 'ceph-1', 'ceph-2']
+        dirs_need_ownership_update.return_value = False
+
+        ceph.utils.upgrade_osd('luminous')
+        service_restart.assert_called_with('ceph-osd.target')
+        update_owner.assert_not_called()
+        _upgrade_single_osd.assert_not_called()
+        status_set.assert_has_calls([
+            call('maintenance', 'Upgrading osd'),
+            call('maintenance', 'Upgrading packages to luminous')
+        ])
+        log.assert_has_calls(
+            [
+                call('Current ceph version is 10.2'),
+                call('Upgrading to: luminous')
+            ]
+        )
+
     @patch.object(ceph.utils, 'stop_osd')
     @patch.object(ceph.utils, 'disable_osd')
     @patch.object(ceph.utils, 'update_owner')
