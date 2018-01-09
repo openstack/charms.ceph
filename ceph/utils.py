@@ -1311,7 +1311,8 @@ def bootstrap_monitor_cluster(secret):
         # Ceph >= 0.61.3 needs this for ceph-mon fs creation
         mkdir('/var/run/ceph', owner=ceph_user(),
               group=ceph_user(), perms=0o755)
-        mkdir(path, owner=ceph_user(), group=ceph_user())
+        mkdir(path, owner=ceph_user(), group=ceph_user(),
+              perms=0o755)
         # end changes for Ceph >= 0.61.3
         try:
             add_keyring_to_ceph(keyring,
@@ -1705,16 +1706,23 @@ def upgrade_monitor(new_version):
             service_stop('ceph-mon-all')
         apt_install(packages=determine_packages(), fatal=True)
 
+        owner = ceph_user()
+
         # Ensure the files and directories under /var/lib/ceph is chowned
         # properly as part of the move to the Jewel release, which moved the
         # ceph daemons to running as ceph:ceph instead of root:root.
         if new_version == 'jewel':
             # Ensure the ownership of Ceph's directories is correct
-            owner = ceph_user()
             chownr(path=os.path.join(os.sep, "var", "lib", "ceph"),
                    owner=owner,
                    group=owner,
                    follow_links=True)
+
+        # Ensure that mon directory is user writable
+        hostname = socket.gethostname()
+        path = '/var/lib/ceph/mon/ceph-{}'.format(hostname)
+        mkdir(path, owner=ceph_user(), group=ceph_user(),
+              perms=0o755)
 
         if systemd():
             for mon_id in get_local_mon_ids():

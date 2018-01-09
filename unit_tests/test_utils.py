@@ -423,7 +423,8 @@ class CephTestCase(unittest.TestCase):
         mock_mkdir.assert_has_calls([
             call('/var/run/ceph', owner='ceph',
                  group='ceph', perms=0o755),
-            call(test_path, owner='ceph', group='ceph'),
+            call(test_path, owner='ceph', group='ceph',
+                 perms=0o755),
         ])
         fake_open.assert_has_calls([call(test_done, 'w'),
                                     call(test_init_marker, 'w')],

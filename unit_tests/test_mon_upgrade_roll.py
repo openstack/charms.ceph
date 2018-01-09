@@ -73,6 +73,9 @@ class UpgradeRollingTestCase(unittest.TestCase):
                      'mon_ip-192-168-1-2_hammer_done 1473279502.69'),
             ])
 
+    @patch.object(ceph.utils, 'ceph_user')
+    @patch.object(ceph.utils, 'socket')
+    @patch.object(ceph.utils, 'mkdir')
     @patch.object(ceph.utils, 'apt_install')
     @patch.object(ceph.utils, 'chownr')
     @patch.object(ceph.utils, 'service_stop')
@@ -89,10 +92,13 @@ class UpgradeRollingTestCase(unittest.TestCase):
                                     systemd, local_mons, add_source,
                                     apt_update, status_set, log,
                                     service_start, service_stop, chownr,
-                                    apt_install):
+                                    apt_install, mkdir, socket,
+                                    ceph_user):
         get_version.side_effect = [0.80, 0.94]
         config.side_effect = config_side_effect
         systemd.return_value = False
+        socket.gethostname.return_value = 'testmon'
+        ceph_user.return_value = 'root'
         local_mons.return_value = ['a']
 
         ceph.utils.upgrade_monitor('hammer')
@@ -110,7 +116,14 @@ class UpgradeRollingTestCase(unittest.TestCase):
             call('maintenance', 'Upgrading monitor'),
         ])
         assert not chownr.called
+        mkdir.assert_called_with('/var/lib/ceph/mon/ceph-testmon',
+                                 owner='root',
+                                 group='root',
+                                 perms=0o755)
 
+    @patch.object(ceph.utils, 'ceph_user')
+    @patch.object(ceph.utils, 'socket')
+    @patch.object(ceph.utils, 'mkdir')
     @patch.object(ceph.utils, 'apt_install')
     @patch.object(ceph.utils, 'chownr')
     @patch.object(ceph.utils, 'service_stop')
@@ -127,10 +140,13 @@ class UpgradeRollingTestCase(unittest.TestCase):
                                    systemd, local_mons, add_source,
                                    apt_update, status_set, log,
                                    service_start, service_stop, chownr,
-                                   apt_install):
+                                   apt_install, mkdir, socket,
+                                   ceph_user):
         get_version.side_effect = [0.94, 10.1]
         config.side_effect = config_side_effect
         systemd.return_value = False
+        socket.gethostname.return_value = 'testmon'
+        ceph_user.return_value = 'ceph'
         local_mons.return_value = ['a']
 
         ceph.utils.upgrade_monitor('jewel')
@@ -153,6 +169,10 @@ class UpgradeRollingTestCase(unittest.TestCase):
                      follow_links=True)
             ]
         )
+        mkdir.assert_called_with('/var/lib/ceph/mon/ceph-testmon',
+                                 owner='ceph',
+                                 group='ceph',
+                                 perms=0o755)
 
     @patch.object(ceph.utils, 'get_version')
     @patch.object(ceph.utils, 'status_set')
