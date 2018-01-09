@@ -1930,7 +1930,10 @@ def upgrade_osd(new_version):
         # way to update the code on the node.
         if not dirs_need_ownership_update('osd'):
             log('Restarting all OSDs to load new binaries', DEBUG)
-            service_restart('ceph-osd-all')
+            if systemd():
+                service_restart('ceph-osd.target')
+            else:
+                service_restart('ceph-osd-all')
             return
 
         # Need to change the ownership of all directories which are not OSD
