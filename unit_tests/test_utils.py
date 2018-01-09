@@ -507,8 +507,11 @@ class CephTestCase(unittest.TestCase):
             utils.osd_noout(True)
 
     def test_pretty_print_upgrade_paths(self):
-        expected = (['firefly -> hammer', 'jewel -> luminous',
-                     'hammer -> jewel'])
+        expected = ([
+            'firefly -> hammer',
+            'hammer -> jewel',
+            'jewel -> luminous',
+        ])
         self.assertEqual(utils.pretty_print_upgrade_paths(), expected)
 
 

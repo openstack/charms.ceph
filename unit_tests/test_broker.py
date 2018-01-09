@@ -64,7 +64,7 @@ class CephBrokerTestCase(unittest.TestCase):
             key='cephx.groups.images',
             service='admin',
             value=json.dumps({"pools": ["glance", "cinder"],
-                              "services": ["nova"]}))
+                              "services": ["nova"]}, sort_keys=True))
         _check_call.assert_called_with([
             'ceph', 'auth', 'caps',
             'client.nova', 'mon', 'allow r', 'osd',
@@ -83,7 +83,8 @@ class CephBrokerTestCase(unittest.TestCase):
         _monitor_key_set.assert_called_with(
             key='cephx.groups.images',
             service='admin',
-            value=json.dumps({"pools": ["glance", "cinder"], "services": []}))
+            value=json.dumps({"pools": ["glance", "cinder"], "services": []},
+                             sort_keys=True))
 
     @patch.object(ceph.broker, 'monitor_key_set')
     @patch.object(ceph.broker, 'monitor_key_get')
@@ -98,7 +99,8 @@ class CephBrokerTestCase(unittest.TestCase):
         _monitor_key_set.assert_called_with(
             key='cephx.groups.images',
             service='admin',
-            value=json.dumps({"pools": ["glance"], "services": []}))
+            value=json.dumps({"pools": ["glance"], "services": []},
+                             sort_keys=True))
 
     def test_pool_permission_list_for_service(self):
         service = {
@@ -142,7 +144,7 @@ class CephBrokerTestCase(unittest.TestCase):
         }
         ceph.broker.save_service(service=service, service_name='nova')
         _monitor_key_set.assert_called_with(
-            value='{"groups": {}, "group_names": {"rwx": "images"}}',
+            value=json.dumps(service, sort_keys=True),
             key='cephx.services.nova',
             service='admin')
 
@@ -195,7 +197,7 @@ class CephBrokerTestCase(unittest.TestCase):
         _monitor_key_set.assert_called_with(
             key='cephx.groups.images',
             service='admin',
-            value=json.dumps(group))
+            value=json.dumps(group, sort_keys=True))
 
     @patch.object(ceph.broker, 'monitor_key_get')
     def test_get_group_empty_str(self, _monitor_key_get):
@@ -254,13 +256,16 @@ class CephBrokerTestCase(unittest.TestCase):
                          {'exit-code': 1,
                           'stderr': "Unknown operation 'invalid_op'"})
 
+    @patch.object(ceph.broker, 'get_osds')
     @patch.object(ceph.broker, 'ReplicatedPool')
     @patch.object(ceph.broker, 'pool_exists')
     @patch.object(ceph.broker, 'log')
     def test_process_requests_create_pool_w_pg_num(self, mock_log,
                                                    mock_pool_exists,
-                                                   mock_replicated_pool):
+                                                   mock_replicated_pool,
+                                                   mock_get_osds):
         mock_pool_exists.return_value = False
+        mock_get_osds.return_value = [0, 1, 2]
         reqs = json.dumps({'api-version': 1,
                            'ops': [{
                                'op': 'create-pool',

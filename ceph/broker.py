@@ -338,7 +338,7 @@ def save_service(service_name, service):
     service['groups'] = {}
     return monitor_key_set(service='admin',
                            key="cephx.services.{}".format(service_name),
-                           value=json.dumps(service))
+                           value=json.dumps(service, sort_keys=True))
 
 
 def save_group(group, group_name):
@@ -346,7 +346,7 @@ def save_group(group, group_name):
     group_key = get_group_key(group_name=group_name)
     return monitor_key_set(service='admin',
                            key=group_key,
-                           value=json.dumps(group))
+                           value=json.dumps(group, sort_keys=True))
 
 
 def get_group_key(group_name):

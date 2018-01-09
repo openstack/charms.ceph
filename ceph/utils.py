@@ -2148,11 +2148,11 @@ def dirs_need_ownership_update(service):
     return False
 
 # A dict of valid ceph upgrade paths. Mapping is old -> new
-UPGRADE_PATHS = {
-    'firefly': 'hammer',
-    'hammer': 'jewel',
-    'jewel': 'luminous',
-}
+UPGRADE_PATHS = collections.OrderedDict([
+    ('firefly', 'hammer'),
+    ('hammer', 'jewel'),
+    ('jewel', 'luminous'),
+])
 
 # Map UCA codenames to ceph codenames
 UCA_CODENAME_MAP = {
