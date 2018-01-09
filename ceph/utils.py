@@ -1700,8 +1700,7 @@ def upgrade_monitor(new_version):
         sys.exit(1)
     try:
         if systemd():
-            for mon_id in get_local_mon_ids():
-                service_stop('ceph-mon@{}'.format(mon_id))
+            service_stop('ceph-mon')
         else:
             service_stop('ceph-mon-all')
         apt_install(packages=determine_packages(), fatal=True)
@@ -1725,8 +1724,7 @@ def upgrade_monitor(new_version):
               perms=0o755)
 
         if systemd():
-            for mon_id in get_local_mon_ids():
-                service_start('ceph-mon@{}'.format(mon_id))
+            service_start('ceph-mon')
         else:
             service_start('ceph-mon-all')
     except subprocess.CalledProcessError as err:

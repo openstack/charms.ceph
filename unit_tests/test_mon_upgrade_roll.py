@@ -115,11 +115,11 @@ class UpgradeRollingTestCase(unittest.TestCase):
         status_set.assert_has_calls([
             call('maintenance', 'Upgrading monitor'),
         ])
-        assert not chownr.called
         mkdir.assert_called_with('/var/lib/ceph/mon/ceph-testmon',
                                  owner='root',
                                  group='root',
                                  perms=0o755)
+        chownr.assert_not_called()
 
     @patch.object(ceph.utils, 'ceph_user')
     @patch.object(ceph.utils, 'socket')
@@ -169,6 +169,52 @@ class UpgradeRollingTestCase(unittest.TestCase):
                      follow_links=True)
             ]
         )
+        mkdir.assert_called_with('/var/lib/ceph/mon/ceph-testmon',
+                                 owner='ceph',
+                                 group='ceph',
+                                 perms=0o755)
+
+    @patch.object(ceph.utils, 'ceph_user')
+    @patch.object(ceph.utils, 'socket')
+    @patch.object(ceph.utils, 'mkdir')
+    @patch.object(ceph.utils, 'apt_install')
+    @patch.object(ceph.utils, 'chownr')
+    @patch.object(ceph.utils, 'service_stop')
+    @patch.object(ceph.utils, 'service_start')
+    @patch.object(ceph.utils, 'log')
+    @patch.object(ceph.utils, 'status_set')
+    @patch.object(ceph.utils, 'apt_update')
+    @patch.object(ceph.utils, 'add_source')
+    @patch.object(ceph.utils, 'systemd')
+    @patch.object(ceph.utils, 'get_version')
+    @patch.object(ceph.utils, 'config')
+    def test_upgrade_monitor_luminous(self, config, get_version,
+                                      systemd, add_source,
+                                      apt_update, status_set, log,
+                                      service_start, service_stop, chownr,
+                                      apt_install, mkdir, socket,
+                                      ceph_user):
+        get_version.side_effect = [10.2, 12.2]
+        config.side_effect = config_side_effect
+        socket.gethostname.return_value = 'testmon'
+        ceph_user.return_value = 'ceph'
+        systemd.return_value = True
+
+        ceph.utils.upgrade_monitor('luminous')
+        service_stop.assert_called_with('ceph-mon')
+        service_start.assert_called_with('ceph-mon')
+        add_source.assert_called_with('cloud:trusty-kilo', 'key')
+
+        log.assert_has_calls(
+            [
+                call('Current ceph version is 10.2'),
+                call('Upgrading to: luminous')
+            ]
+        )
+        status_set.assert_has_calls([
+            call('maintenance', 'Upgrading monitor'),
+        ])
+        chownr.assert_not_called()
         mkdir.assert_called_with('/var/lib/ceph/mon/ceph-testmon',
                                  owner='ceph',
                                  group='ceph',
