@@ -1674,12 +1674,23 @@ def roll_monitor_cluster(new_version, upgrade_key):
                           service='mon',
                           my_name=my_name,
                           version=new_version)
+        # NOTE(jamespage):
+        # Wait until all monitors have upgraded before bootstrapping
+        # the ceph-mgr daemons due to use of new mgr keyring profiles
+        if new_version == 'luminous':
+            wait_for_all_monitors_to_upgrade(new_version=new_version,
+                                             upgrade_key=upgrade_key)
+            bootstrap_manager()
     except ValueError:
         log("Failed to find {} in list {}.".format(
             my_name, mon_sorted_list))
         status_set('blocked', 'failed to upgrade monitor')
 
 
+# TODO(jamespage):
+# Mimic support will need to ensure that ceph-mgr daemons are also
+# restarted during upgrades - probably through use of one of the
+# high level systemd targets shipped by the packaging.
 def upgrade_monitor(new_version):
     """Upgrade the current ceph monitor to the new version
 
@@ -1883,7 +1894,7 @@ def roll_osd_cluster(new_version, upgrade_key):
                           version=new_version)
         else:
             # Check if the previous node has finished
-            status_set('blocked',
+            status_set('waiting',
                        'Waiting on {} to finish upgrading'.format(
                            osd_sorted_list[position - 1].name))
             wait_on_previous_node(

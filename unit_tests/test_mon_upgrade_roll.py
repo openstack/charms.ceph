@@ -223,21 +223,22 @@ class UpgradeRollingTestCase(unittest.TestCase):
                                  group='ceph',
                                  perms=0o755)
 
-    @patch.object(ceph.utils, 'get_version')
+    @patch.object(ceph.utils, 'bootstrap_manager')
+    @patch.object(ceph.utils, 'wait_for_all_monitors_to_upgrade')
     @patch.object(ceph.utils, 'status_set')
     @patch.object(ceph.utils, 'lock_and_roll')
     @patch.object(ceph.utils, 'wait_on_previous_node')
     @patch.object(ceph.utils, 'get_mon_map')
     @patch.object(ceph.utils, 'socket')
-    def test_roll_monitor_cluster_second(self,
-                                         socket,
-                                         get_mon_map,
-                                         wait_on_previous_node,
-                                         lock_and_roll,
-                                         status_set,
-                                         get_version):
-        get_version.return_value = "0.94.1"
-        wait_on_previous_node.return_value = None
+    def _test_roll_monitor_cluster(self,
+                                   socket,
+                                   get_mon_map,
+                                   wait_on_previous_node,
+                                   lock_and_roll,
+                                   status_set,
+                                   wait_for_all_monitors_to_upgrade,
+                                   bootstrap_manager,
+                                   new_version):
         socket.gethostname.return_value = "ip-192-168-1-3"
         get_mon_map.return_value = {
             'monmap': {
@@ -251,15 +252,40 @@ class UpgradeRollingTestCase(unittest.TestCase):
                 ]
             }
         }
-        ceph.utils.roll_monitor_cluster(new_version='0.94.1',
+        ceph.utils.roll_monitor_cluster(new_version=new_version,
                                         upgrade_key='admin')
+        get_mon_map.assert_called_once_with('admin')
+        wait_on_previous_node.assert_called_with(
+            upgrade_key='admin',
+            service='mon',
+            previous_node='ip-192-168-1-2',
+            version=new_version,
+        )
         status_set.assert_called_with(
             'waiting',
             'Waiting on ip-192-168-1-2 to finish upgrading')
         lock_and_roll.assert_called_with(my_name='ip-192-168-1-3',
                                          service='mon',
                                          upgrade_key='admin',
-                                         version='0.94.1')
+                                         version=new_version)
+        if new_version == 'luminous':
+            wait_for_all_monitors_to_upgrade.assert_called_with(
+                new_version=new_version,
+                upgrade_key='admin',
+            )
+            bootstrap_manager.assert_called_once_with()
+        else:
+            wait_for_all_monitors_to_upgrade.assert_not_called()
+            bootstrap_manager.assert_not_called()
+
+    def test_roll_monitor_cluster_luminous(self):
+        self._test_roll_monitor_cluster(new_version='luminous')
+
+    def test_roll_monitor_cluster_jewel(self):
+        self._test_roll_monitor_cluster(new_version='jewel')
+
+    def test_roll_monitor_cluster_hammer(self):
+        self._test_roll_monitor_cluster(new_version='hammer')
 
     @patch.object(ceph.utils, 'log')
     @patch.object(ceph.utils, 'time')

@@ -332,7 +332,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
         ceph.utils.roll_osd_cluster(new_version='0.94.1',
                                     upgrade_key='osd-upgrade')
         status_set.assert_called_with(
-            'blocked',
+            'waiting',
             'Waiting on ip-192-168-1-2 to finish upgrading')
         lock_and_roll.assert_called_with(my_name='ip-192-168-1-3',
                                          service='osd',
