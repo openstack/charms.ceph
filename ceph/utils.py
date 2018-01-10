@@ -1805,25 +1805,28 @@ def wait_on_previous_node(upgrade_key, service, previous_node, version):
         previous_node_start_time = monitor_key_get(
             upgrade_key,
             "{}_{}_{}_start".format(service, previous_node, version))
-        if (current_timestamp - (10 * 60)) > previous_node_start_time:
-            # Previous node is probably dead. Lets move on
-            if previous_node_start_time is not None:
-                log(
-                    "Waited 10 mins on node {}. current time: {} > "
-                    "previous node start time: {} Moving on".format(
-                        previous_node,
-                        (current_timestamp - (10 * 60)),
-                        previous_node_start_time))
-                return
-        else:
-            # I have to wait. Sleep a random amount of time and then
-            # check if I can lock,upgrade and roll.
-            wait_time = random.randrange(5, 30)
-            log('waiting for {} seconds'.format(wait_time))
-            time.sleep(wait_time)
-            previous_node_finished = monitor_key_exists(
-                upgrade_key,
-                "{}_{}_{}_done".format(service, previous_node, version))
+        if (previous_node_start_time is not None and
+                ((current_timestamp - (10 * 60)) >
+                 float(previous_node_start_time))):
+            # NOTE(jamespage):
+            # Previous node is probably dead as we've been waiting
+            # for 10 minutes - lets move on and upgrade
+            log("Waited 10 mins on node {}. current time: {} > "
+                "previous node start time: {} Moving on".format(
+                    previous_node,
+                    (current_timestamp - (10 * 60)),
+                    previous_node_start_time))
+            return
+        # NOTE(jamespage)
+        # Previous node has not started, or started less than
+        # 10 minutes ago - sleep a random amount of time and
+        # then check again.
+        wait_time = random.randrange(5, 30)
+        log('waiting for {} seconds'.format(wait_time))
+        time.sleep(wait_time)
+        previous_node_finished = monitor_key_exists(
+            upgrade_key,
+            "{}_{}_{}_done".format(service, previous_node, version))
 
 
 def get_upgrade_position(osd_sorted_list, match_name):

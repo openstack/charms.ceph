@@ -46,7 +46,10 @@ def monitor_key_side_effect(*args):
     elif args[1] == \
             'mon_ip-192-168-1-2_0.94.1_start':
         # Return that the previous node started 9 minutes ago
-        return previous_node_start_time
+        # NOTE(jamespage):
+        # Pass back as string as this is what we actually get
+        # from the monitor cluster
+        return str(previous_node_start_time)
 
 
 class UpgradeRollingTestCase(unittest.TestCase):
@@ -292,4 +295,4 @@ class UpgradeRollingTestCase(unittest.TestCase):
             [call('Previous node is: ip-192-168-1-2')],
             [call('ip-192-168-1-2 is not finished. Waiting')],
         )
-        self.assertEqual(tval[0], previous_node_start_time + 700)
+        self.assertGreaterEqual(tval[0], previous_node_start_time + 600)
