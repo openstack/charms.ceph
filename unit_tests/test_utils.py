@@ -46,6 +46,27 @@ class CephTestCase(unittest.TestCase):
     def setUp(self):
         super(CephTestCase, self).setUp()
 
+    @patch.object(utils, 'cmp_pkgrevno')
+    @patch.object(utils.subprocess, 'call')
+    @patch.object(utils.os.path, 'exists')
+    @patch.object(utils.os.path, 'isdir')
+    def test_start_osd(self,
+                       _isdir,
+                       _exists,
+                       _call,
+                       _pkgrevno):
+        _pkgrevno.return_value = True
+        _isdir.return_value = False
+        utils.start_osds(['/dev/sdb'])
+        _isdir.assert_called_once_with('/dev/sdb')
+        _exists.assert_called_once_with('/dev/sdb')
+        _call.assert_has_calls([
+            call(['udevadm', 'trigger',
+                  '--subsystem-match=block', '--action=add'
+                  ]),
+            call(['udevadm', 'settle']),
+        ])
+
     @patch.object(utils.subprocess, 'check_call')
     @patch.object(utils.os.path, 'exists')
     @patch.object(utils, 'is_device_mounted')
