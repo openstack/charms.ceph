@@ -1358,10 +1358,17 @@ def add_keyring_to_ceph(keyring, secret, hostname, path, done, init_marker):
         #                  admin keys for the cluster; this command
         #                  will wait for quorum in the cluster before
         #                  returning.
-        cmd = ['ceph-create-keys', '--id', hostname]
+        # NOTE(fnordahl): The default timeout in ceph-create-keys of 600
+        #                 seconds is not adequate for all situations.
+        #                 LP#1719436
+        cmd = ['ceph-create-keys', '--id', hostname, '--timeout', '1800']
         subprocess.check_call(cmd)
-    osstat = os.stat("/etc/ceph/ceph.client.admin.keyring")
+    _client_admin_keyring = '/etc/ceph/ceph.client.admin.keyring'
+    osstat = os.stat(_client_admin_keyring)
     if not osstat.st_size:
+        # NOTE(fnordahl): Retry will fail as long as this file exists.
+        #                 LP#1719436
+        os.remove(_client_admin_keyring)
         raise Exception
 
 

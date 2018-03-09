@@ -432,7 +432,8 @@ class CephTestCase(unittest.TestCase):
         ]
         if luminous:
             test_calls.append(
-                call(['ceph-create-keys', '--id', test_hostname])
+                call(['ceph-create-keys', '--id', test_hostname, '--timeout',
+                      '1800'])
             )
 
         fake_open = mock_open()
