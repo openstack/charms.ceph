@@ -1513,10 +1513,19 @@ def osdize_dev(dev, osd_format, osd_journal, reformat_osd=False,
         log("osdize cmd: {}".format(cmd))
         subprocess.check_call(cmd)
     except subprocess.CalledProcessError:
+        try:
+            lsblk_output = subprocess.check_output(
+                ['lsblk', '-P']).decode('UTF-8')
+        except subprocess.CalledProcessError as e:
+            log("Couldn't get lsblk output: {}".format(e), ERROR)
         if ignore_errors:
             log('Unable to initialize device: {}'.format(dev), WARNING)
+            if lsblk_output:
+                log('lsblk output: {}'.format(lsblk_output), DEBUG)
         else:
             log('Unable to initialize device: {}'.format(dev), ERROR)
+            if lsblk_output:
+                log('lsblk output: {}'.format(lsblk_output), WARNING)
             raise
 
 
