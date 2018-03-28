@@ -68,20 +68,52 @@ class CephTestCase(unittest.TestCase):
         ])
 
     @patch.object(utils.subprocess, 'check_call')
+    @patch.object(utils, 'zap_disk')
+    @patch.object(utils, '_ceph_disk')
+    @patch.object(utils, 'is_active_bluestore_device')
     @patch.object(utils.os.path, 'exists')
     @patch.object(utils, 'is_device_mounted')
     @patch.object(utils, 'cmp_pkgrevno')
     @patch.object(utils, 'is_block_device')
-    def test_osdize_dev(self, _is_blk, _cmp, _mounted, _exists, _call):
-        """Test that the dev osd is initialized correctly"""
+    def test_osdize_dev_ceph_disk(self, _is_blk, _cmp, _mounted, _exists,
+                                  _is_active_bluestore_device, _ceph_disk,
+                                  _zap_disk, _check_call):
+        """Test that _ceph_disk is called for < Luminous 12.2.4"""
         _is_blk.return_value = True
         _mounted.return_value = False
         _exists.return_value = True
-        _cmp.return_value = True
+        _cmp.return_value = -1
+        _ceph_disk.return_value = ['ceph-disk', 'prepare']
+        _is_active_bluestore_device.return_value = False
         utils.osdize('/dev/sdb', osd_format='xfs', osd_journal=None,
                      reformat_osd=True, bluestore=False)
-        _call.assert_called_with(['ceph-disk', 'prepare', '--fs-type', 'xfs',
-                                  '--zap-disk', '--filestore', '/dev/sdb'])
+        _ceph_disk.assert_called_with('/dev/sdb', 'xfs', None, False, False)
+        _check_call.assert_called_with(['ceph-disk', 'prepare'])
+        _zap_disk.assert_called_once()
+
+    @patch.object(utils.subprocess, 'check_call')
+    @patch.object(utils, 'zap_disk')
+    @patch.object(utils, '_ceph_volume')
+    @patch.object(utils, 'is_active_bluestore_device')
+    @patch.object(utils.os.path, 'exists')
+    @patch.object(utils, 'is_device_mounted')
+    @patch.object(utils, 'cmp_pkgrevno')
+    @patch.object(utils, 'is_block_device')
+    def test_osdize_dev_ceph_volume(self, _is_blk, _cmp, _mounted, _exists,
+                                    _is_active_bluestore_device, _ceph_volume,
+                                    _zap_disk, _check_call):
+        """Test that _ceph_volume is called for >= Luminous 12.2.4"""
+        _is_blk.return_value = True
+        _mounted.return_value = False
+        _exists.return_value = True
+        _cmp.return_value = 1
+        _ceph_volume.return_value = ['ceph-volume', 'prepare']
+        _is_active_bluestore_device.return_value = False
+        utils.osdize('/dev/sdb', osd_format='xfs', osd_journal=None,
+                     reformat_osd=True, bluestore=False)
+        _ceph_volume.assert_called_with('/dev/sdb', None, False, False)
+        _check_call.assert_called_with(['ceph-volume', 'prepare'])
+        _zap_disk.assert_called_once()
 
     @patch.object(utils.subprocess, 'check_call')
     @patch.object(utils.os.path, 'exists')
@@ -537,6 +569,536 @@ class CephTestCase(unittest.TestCase):
         ])
         self.assertEqual(utils.pretty_print_upgrade_paths(), expected)
 
+    @patch.object(utils.subprocess, 'check_output')
+    def test_get_conf(self, _check_output):
+        _check_output.return_value = '12345\n'
+        self.assertEqual(utils.get_conf('bluestore_block_db_size'),
+                         '12345')
+        _check_output.assert_called_with([
+            'ceph-osd',
+            '--show-config-value=bluestore_block_db_size',
+        ])
+
+    def test_partition_name(self):
+        self.assertEqual(utils._partition_name('/dev/sdb'),
+                         '/dev/sdb1')
+        self.assertEqual(utils._partition_name('/dev/mmcblk0'),
+                         '/dev/mmcblk0p1')
+
+
+class CephVolumeSizeCalculatorTestCase(unittest.TestCase):
+
+    @patch.object(utils, 'get_conf')
+    def test_calculate_volume_size_journal(self, _get_conf):
+        _get_conf.return_value = 0
+        self.assertEqual(utils.calculate_volume_size('journal'),
+                         1024)
+        _get_conf.assert_called_with('osd_journal_size')
+
+        _get_conf.return_value = 2048
+        self.assertEqual(utils.calculate_volume_size('journal'),
+                         2048)
+
+    @patch.object(utils, 'get_conf')
+    def test_calculate_volume_size_db(self, _get_conf):
+        _get_conf.return_value = 0
+        self.assertEqual(utils.calculate_volume_size('db'),
+                         1024)
+        _get_conf.assert_called_with('bluestore_block_db_size')
+
+        _get_conf.return_value = 2048 * 1048576
+        self.assertEqual(utils.calculate_volume_size('db'),
+                         2048)
+
+    @patch.object(utils, 'get_conf')
+    def test_calculate_volume_size_wal(self, _get_conf):
+        _get_conf.return_value = 0
+        self.assertEqual(utils.calculate_volume_size('wal'),
+                         576)
+        _get_conf.assert_called_with('bluestore_block_wal_size')
+
+        _get_conf.return_value = 512 * 1048576
+        self.assertEqual(utils.calculate_volume_size('wal'),
+                         512)
+
+    def test_calculate_volume_size_invalid(self):
+        with self.assertRaises(KeyError):
+            utils.calculate_volume_size('invalid')
+
+
+class CephInitializeDiskTestCase(unittest.TestCase):
+
+    @patch.object(utils.subprocess, 'check_call')
+    @patch.object(utils.os.path, 'exists')
+    def test_initialize_disk(self, _exists, _check_call):
+        _exists.return_value = False
+        self.assertEqual(utils._initialize_disk('/dev/sdb'),
+                         '/dev/sdb1')
+        _check_call.assert_has_calls([
+            call([
+                'parted', '--script',
+                '/dev/sdb',
+                'mklabel',
+                'gpt',
+            ]),
+            call([
+                'parted', '--script',
+                '/dev/sdb',
+                'mkpart',
+                'primary', '1', '100%',
+            ]),
+        ])
+
+    @patch.object(utils.subprocess, 'check_call')
+    @patch.object(utils.os.path, 'exists')
+    def test_initialize_disk_exists(self, _exists, _check_call):
+        _exists.return_value = True
+        self.assertEqual(utils._initialize_disk('/dev/sdb'),
+                         '/dev/sdb1')
+        _check_call.assert_not_called()
+
+
+class CephActiveBlueStoreDeviceTestCase(unittest.TestCase):
+
+    _test_pvs = {
+        '/dev/sdb1': 'ceph-1234',
+        '/dev/sdc1': 'ceph-5678',
+        '/dev/sde1': 'ceph-9101',
+    }
+
+    _test_vgs = {
+        'ceph-1234': ['osd-block-1234'],
+        'ceph-5678': ['osd-block-5678'],
+        'ceph-9101': ['osd-block-9101'],
+    }
+
+    _test_links = {
+        '/var/lib/ceph/osd/ceph-4/block': '/dev/ceph-1234/osd-block-1234',
+        '/var/lib/ceph/osd/ceph-6/block': '/dev/ceph-5678/osd-block-5678',
+    }
+
+    @patch.object(utils, 'glob')
+    @patch.object(utils, 'os')
+    @patch.object(utils, 'lvm')
+    def _test_active_bluestore_device(self, _lvm, _os, _glob, device, active):
+        _os.path.is_link.return_value = True
+        _glob.glob.return_value = self._test_links.keys()
+        _lvm.is_lvm_physical_volume.side_effect = (
+            lambda dev: dev in self._test_pvs
+        )
+        _lvm.list_lvm_volume_group.side_effect = (
+            lambda pv: self._test_pvs.get(pv)
+        )
+        _lvm.list_logical_volumes.side_effect = (
+            lambda vg: self._test_vgs.get(vg.lstrip('vg_name='), [])
+        )
+        _os.readlink.side_effect = (
+            lambda link: self._test_links.get(link)
+        )
+        pv_dev = utils._partition_name(device)
+
+        self.assertEqual(utils.is_active_bluestore_device(device),
+                         active)
+        _lvm.is_lvm_physical_volume.assert_called_with(pv_dev)
+        if pv_dev in self._test_pvs:
+            _lvm.list_lvm_volume_group.assert_called_with(pv_dev)
+            _lvm.list_logical_volumes.assert_called_with(
+                'vg_name={}'.format(self._test_pvs.get(pv_dev))
+            )
+            _glob.glob.assert_called_with('/var/lib/ceph/osd/ceph-*/block')
+        else:
+            _lvm.list_lvm_volume_group.assert_not_called()
+            _lvm.list_logical_volumes.assert_not_called()
+            _glob.glob.assert_not_called()
+
+    def test_active_bluestore_device_active(self):
+        self._test_active_bluestore_device(device='/dev/sdb', active=True)
+        self._test_active_bluestore_device(device='/dev/sdc', active=True)
+
+    def test_active_bluestore_device_inactive_not_pv(self):
+        self._test_active_bluestore_device(device='/dev/sdd', active=False)
+
+    def test_active_bluestore_device_inactive_not_inuse(self):
+        self._test_active_bluestore_device(device='/dev/sde', active=False)
+
+
+class CephAllocateVolumeTestCase(unittest.TestCase):
+
+    _lvs = ['osd-data-1234', 'osd-block-1234', 'osd-journal-1234']
+    _vgs = {
+        '/dev/sdb1': 'ceph-1234'
+    }
+
+    @patch.object(utils, '_initialize_disk')
+    @patch.object(utils.uuid, 'uuid4')
+    @patch.object(utils, 'lvm')
+    def _test_allocate_logical_volume(self, _lvm, _uuid4, _initialize_disk,
+                                      dev, lv_type, osd_fsid,
+                                      size=None, shared=False):
+        test_uuid = '1234-1234-1234-1234'
+        pv_dev = utils._partition_name(dev)
+
+        _lvm.list_logical_volumes.return_value = self._lvs
+        _initialize_disk.return_value = pv_dev
+        _lvm.is_lvm_physical_volume.side_effect = lambda pv: pv in self._vgs
+        _lvm.list_lvm_volume_group.side_effect = lambda pv: self._vgs.get(pv)
+
+        _uuid4.return_value = test_uuid
+
+        lv_name = 'osd-{}-{}'.format(lv_type, osd_fsid)
+        if shared:
+            vg_name = 'ceph-{}-{}'.format(lv_type, test_uuid)
+        else:
+            vg_name = 'ceph-{}'.format(osd_fsid)
+
+        self.assertEqual(utils._allocate_logical_volume(dev, lv_type, osd_fsid,
+                                                        size, shared),
+                         '{}/{}'.format(vg_name, lv_name))
+
+        if pv_dev not in self._vgs:
+            _lvm.create_lvm_physical_volume.assert_called_with(pv_dev)
+            _lvm.create_lvm_volume_group.assert_called_with(vg_name, pv_dev)
+        else:
+            _lvm.create_lvm_physical_volume.assert_not_called()
+            _lvm.create_lvm_volume_group.assert_not_called()
+            _lvm.list_lvm_volume_group.assert_called_with(pv_dev)
+
+        if lv_name not in self._lvs:
+            _lvm.create_logical_volume.assert_called_with(lv_name, vg_name,
+                                                          size)
+        else:
+            _lvm.create_logical_volume.assert_not_called()
+
+        _initialize_disk.assert_called_with(dev)
+
+    def test_allocate_lv_already_pv(self):
+        self._test_allocate_logical_volume(dev='/dev/sdb', lv_type='data',
+                                           osd_fsid='1234')
+
+    def test_allocate_lv_new_pv(self):
+        self._test_allocate_logical_volume(dev='/dev/sdc', lv_type='data',
+                                           osd_fsid='5678')
+
+    def test_allocate_lv_shared_type(self):
+        self._test_allocate_logical_volume(dev='/dev/sdc', lv_type='wal',
+                                           osd_fsid='5678', shared=True)
+
+    def test_allocate_lv_already_exists(self):
+        self._test_allocate_logical_volume(dev='/dev/sdd', lv_type='data',
+                                           osd_fsid='1234')
+
+
+class CephDiskTestCase(unittest.TestCase):
+
+    @patch.object(utils, 'cmp_pkgrevno')
+    @patch.object(utils, 'find_least_used_utility_device')
+    @patch.object(utils, 'get_devices')
+    def test_ceph_disk_filestore(self, _get_devices,
+                                 _find_least_used_utility_device,
+                                 _cmp_pkgrevno):
+        # >= Jewel < Luminous RC
+        _cmp_pkgrevno.side_effect = [1, -1]
+        _get_devices.return_value = []
+        self.assertEqual(
+            utils._ceph_disk('/dev/sdb',
+                             osd_format='xfs',
+                             osd_journal=None,
+                             encrypt=False,
+                             bluestore=False),
+            ['ceph-disk', 'prepare',
+             '--fs-type', 'xfs',
+             '/dev/sdb']
+        )
+
+    @patch.object(utils, 'cmp_pkgrevno')
+    @patch.object(utils, 'find_least_used_utility_device')
+    @patch.object(utils, 'get_devices')
+    def test_ceph_disk_filestore_luminous(self, _get_devices,
+                                          _find_least_used_utility_device,
+                                          _cmp_pkgrevno):
+        # >= Jewel
+        _cmp_pkgrevno.return_value = 1
+        _get_devices.return_value = []
+        self.assertEqual(
+            utils._ceph_disk('/dev/sdb',
+                             osd_format='xfs',
+                             osd_journal=None,
+                             encrypt=False,
+                             bluestore=False),
+            ['ceph-disk', 'prepare',
+             '--fs-type', 'xfs',
+             '--filestore', '/dev/sdb']
+        )
+
+    @patch.object(utils, 'cmp_pkgrevno')
+    @patch.object(utils, 'find_least_used_utility_device')
+    @patch.object(utils, 'get_devices')
+    def test_ceph_disk_filestore_journal(self, _get_devices,
+                                         _find_least_used_utility_device,
+                                         _cmp_pkgrevno):
+        # >= Jewel
+        _cmp_pkgrevno.return_value = 1
+        _get_devices.return_value = []
+        _find_least_used_utility_device.side_effect = \
+            lambda x, lvs=False: x[0]
+        self.assertEqual(
+            utils._ceph_disk('/dev/sdb',
+                             osd_format='xfs',
+                             osd_journal=['/dev/sdc'],
+                             encrypt=False,
+                             bluestore=False),
+            ['ceph-disk', 'prepare',
+             '--fs-type', 'xfs',
+             '--filestore', '/dev/sdb',
+             '/dev/sdc']
+        )
+
+    @patch.object(utils, 'cmp_pkgrevno')
+    @patch.object(utils, 'find_least_used_utility_device')
+    @patch.object(utils, 'get_devices')
+    def test_ceph_disk_bluestore(self, _get_devices,
+                                 _find_least_used_utility_device,
+                                 _cmp_pkgrevno):
+        # >= Jewel
+        _cmp_pkgrevno.return_value = 1
+        _get_devices.return_value = []
+        _find_least_used_utility_device.side_effect = \
+            lambda x, lvs=False: x[0]
+        self.assertEqual(
+            utils._ceph_disk('/dev/sdb',
+                             osd_format='xfs',
+                             osd_journal=None,
+                             encrypt=False,
+                             bluestore=True),
+            ['ceph-disk', 'prepare',
+             '--bluestore', '/dev/sdb']
+        )
+
+    @patch.object(utils, 'cmp_pkgrevno')
+    @patch.object(utils, 'find_least_used_utility_device')
+    @patch.object(utils, 'get_devices')
+    def test_ceph_disk_bluestore_dbwal(self, _get_devices,
+                                       _find_least_used_utility_device,
+                                       _cmp_pkgrevno):
+        # >= Jewel
+        _cmp_pkgrevno.return_value = 1
+        _bluestore_devs = {
+            'bluestore-db': ['/dev/sdc'],
+            'bluestore-wal': ['/dev/sdd'],
+        }
+        _get_devices.side_effect = lambda x: _bluestore_devs.get(x, [])
+        _find_least_used_utility_device.side_effect = \
+            lambda x, lvs=False: x[0]
+        self.assertEqual(
+            utils._ceph_disk('/dev/sdb',
+                             osd_format='xfs',
+                             osd_journal=None,
+                             encrypt=False,
+                             bluestore=True),
+            ['ceph-disk', 'prepare',
+             '--bluestore',
+             '--block.wal', '/dev/sdd',
+             '--block.db', '/dev/sdc',
+             '/dev/sdb']
+        )
+
+
+class CephVolumeTestCase(unittest.TestCase):
+
+    _osd_uuid = '22b371a5-0db9-4154-b011-23f8f03c4d8c'
+
+    @patch.object(utils.uuid, 'uuid4')
+    @patch.object(utils, 'calculate_volume_size')
+    @patch.object(utils, 'find_least_used_utility_device')
+    @patch.object(utils, 'get_devices')
+    @patch.object(utils, '_allocate_logical_volume')
+    def test_ceph_volume_filestore(self, _allocate_logical_volume,
+                                   _get_devices,
+                                   _find_least_used_utility_device,
+                                   _calculate_volume_size, _uuid4):
+        _get_devices.return_value = []
+        _calculate_volume_size.return_value = 1024
+        _uuid4.return_value = self._osd_uuid
+        _allocate_logical_volume.side_effect = (
+            lambda dev, lv_type, osd_fsid, size=None, shared=False: (
+                'ceph-{fsid}/osd-{type}-{fsid}'.format(fsid=osd_fsid,
+                                                       type=lv_type)
+            )
+        )
+        self.assertEqual(
+            utils._ceph_volume('/dev/sdb',
+                               osd_journal=None,
+                               encrypt=False,
+                               bluestore=False),
+            ['ceph-volume',
+             'lvm',
+             'create',
+             '--osd-fsid',
+             self._osd_uuid,
+             '--filestore',
+             '--journal',
+             ('ceph-{fsid}/'
+              'osd-journal-{fsid}').format(fsid=self._osd_uuid),
+             '--data',
+             ('ceph-{fsid}/'
+              'osd-data-{fsid}').format(fsid=self._osd_uuid)]
+        )
+        _allocate_logical_volume.assert_has_calls([
+            call('/dev/sdb', 'journal', self._osd_uuid, size='1024M'),
+            call('/dev/sdb', 'data', self._osd_uuid),
+        ])
+        _find_least_used_utility_device.assert_not_called()
+        _calculate_volume_size.assert_called_with('journal')
+
+    @patch.object(utils.uuid, 'uuid4')
+    @patch.object(utils, 'calculate_volume_size')
+    @patch.object(utils, 'find_least_used_utility_device')
+    @patch.object(utils, 'get_devices')
+    @patch.object(utils, '_allocate_logical_volume')
+    def test_ceph_volume_filestore_db_and_wal(self, _allocate_logical_volume,
+                                              _get_devices,
+                                              _find_least_used_utility_device,
+                                              _calculate_volume_size, _uuid4):
+        _find_least_used_utility_device.side_effect = \
+            lambda x, lvs=False: x[0]
+        _calculate_volume_size.return_value = 1024
+        _uuid4.return_value = self._osd_uuid
+        _allocate_logical_volume.side_effect = (
+            lambda dev, lv_type, osd_fsid, size=None, shared=False: (
+                'ceph-{fsid}/osd-{type}-{fsid}'.format(fsid=osd_fsid,
+                                                       type=lv_type)
+            )
+        )
+        self.assertEqual(
+            utils._ceph_volume('/dev/sdb',
+                               osd_journal=['/dev/sdc'],
+                               encrypt=False,
+                               bluestore=False),
+            ['ceph-volume',
+             'lvm',
+             'create',
+             '--osd-fsid',
+             self._osd_uuid,
+             '--filestore',
+             '--data',
+             ('ceph-{fsid}/'
+              'osd-data-{fsid}').format(fsid=self._osd_uuid),
+             '--journal',
+             ('ceph-{fsid}/'
+              'osd-journal-{fsid}').format(fsid=self._osd_uuid)]
+        )
+        _allocate_logical_volume.assert_has_calls([
+            call('/dev/sdb', 'data', self._osd_uuid),
+            call('/dev/sdc', 'journal', self._osd_uuid,
+                 shared=True, size='1024M'),
+        ])
+        _find_least_used_utility_device.assert_has_calls([
+            call(['/dev/sdc'], lvs=True),
+        ])
+        _calculate_volume_size.assert_has_calls([
+            call('journal'),
+        ])
+
+    @patch.object(utils.uuid, 'uuid4')
+    @patch.object(utils, 'calculate_volume_size')
+    @patch.object(utils, 'find_least_used_utility_device')
+    @patch.object(utils, 'get_devices')
+    @patch.object(utils, '_allocate_logical_volume')
+    def test_ceph_volume_bluestore(self, _allocate_logical_volume,
+                                   _get_devices,
+                                   _find_least_used_utility_device,
+                                   _calculate_volume_size, _uuid4):
+        _get_devices.return_value = []
+        _calculate_volume_size.return_value = 1024
+        _uuid4.return_value = self._osd_uuid
+        _allocate_logical_volume.side_effect = (
+            lambda dev, lv_type, osd_fsid, size=None, shared=False: (
+                'ceph-{fsid}/osd-{type}-{fsid}'.format(fsid=osd_fsid,
+                                                       type=lv_type)
+            )
+        )
+        self.assertEqual(
+            utils._ceph_volume('/dev/sdb',
+                               osd_journal=None,
+                               encrypt=False,
+                               bluestore=True),
+            ['ceph-volume',
+             'lvm',
+             'create',
+             '--osd-fsid',
+             self._osd_uuid,
+             '--bluestore',
+             '--data',
+             ('ceph-{fsid}/'
+              'osd-block-{fsid}').format(fsid=self._osd_uuid)]
+        )
+        _allocate_logical_volume.assert_has_calls([
+            call('/dev/sdb', 'block', self._osd_uuid),
+        ])
+        _find_least_used_utility_device.assert_not_called()
+        _calculate_volume_size.assert_not_called()
+
+    @patch.object(utils.uuid, 'uuid4')
+    @patch.object(utils, 'calculate_volume_size')
+    @patch.object(utils, 'find_least_used_utility_device')
+    @patch.object(utils, 'get_devices')
+    @patch.object(utils, '_allocate_logical_volume')
+    def test_ceph_volume_bluestore_db_and_wal(self, _allocate_logical_volume,
+                                              _get_devices,
+                                              _find_least_used_utility_device,
+                                              _calculate_volume_size, _uuid4):
+        _bluestore_devs = {
+            'bluestore-db': ['/dev/sdc'],
+            'bluestore-wal': ['/dev/sdd'],
+        }
+        _get_devices.side_effect = lambda x: _bluestore_devs.get(x, [])
+        _find_least_used_utility_device.side_effect = \
+            lambda x, lvs=False: x[0]
+        _calculate_volume_size.return_value = 1024
+        _uuid4.return_value = self._osd_uuid
+        _allocate_logical_volume.side_effect = (
+            lambda dev, lv_type, osd_fsid, size=None, shared=False: (
+                'ceph-{fsid}/osd-{type}-{fsid}'.format(fsid=osd_fsid,
+                                                       type=lv_type)
+            )
+        )
+        self.assertEqual(
+            utils._ceph_volume('/dev/sdb',
+                               osd_journal=None,
+                               encrypt=False,
+                               bluestore=True),
+            ['ceph-volume',
+             'lvm',
+             'create',
+             '--osd-fsid',
+             self._osd_uuid,
+             '--bluestore',
+             '--data',
+             ('ceph-{fsid}/'
+              'osd-block-{fsid}').format(fsid=self._osd_uuid),
+             '--block.wal',
+             ('ceph-{fsid}/'
+              'osd-wal-{fsid}').format(fsid=self._osd_uuid),
+             '--block.db',
+             ('ceph-{fsid}/'
+              'osd-db-{fsid}').format(fsid=self._osd_uuid)]
+        )
+        _allocate_logical_volume.assert_has_calls([
+            call('/dev/sdb', 'block', self._osd_uuid),
+            call('/dev/sdd', 'wal', self._osd_uuid,
+                 shared=True, size='1024M'),
+            call('/dev/sdc', 'db', self._osd_uuid,
+                 shared=True, size='1024M'),
+        ])
+        _find_least_used_utility_device.assert_has_calls([
+            call(['/dev/sdd'], lvs=True),
+            call(['/dev/sdc'], lvs=True),
+        ])
+        _calculate_volume_size.assert_has_calls([
+            call('wal'),
+            call('db'),
+        ])
+
 
 class CephVersionTestCase(unittest.TestCase):
     @patch.object(utils, 'get_os_codename_install_source')
@@ -559,3 +1121,100 @@ class CephVersionTestCase(unittest.TestCase):
         get_os_codename_install_source.return_value = 'ocata'
         self.assertEqual(utils.resolve_ceph_version(
                          'cloud:xenial-ocata'), 'jewel')
+
+
+class CephFindLeastUsedDeviceTestCase(unittest.TestCase):
+
+    _parts = {
+        '/dev/sdb': ['1', '2', '3'],
+        '/dev/sdc': ['1']
+    }
+
+    @patch.object(utils, 'get_partitions')
+    def test_find_least_used_utility_device(self, _get_partitions):
+        _get_partitions.side_effect = lambda dev: self._parts.get(dev, [])
+        self.assertEqual(
+            utils.find_least_used_utility_device(['/dev/sdb',
+                                                  '/dev/sdx',
+                                                  '/dev/sdc']),
+            '/dev/sdx'
+        )
+        self.assertEqual(
+            utils.find_least_used_utility_device(['/dev/sdb', '/dev/sdc']),
+            '/dev/sdc'
+        )
+        self.assertEqual(
+            utils.find_least_used_utility_device(['/dev/sdb']),
+            '/dev/sdb'
+        )
+        _get_partitions.assert_called()
+
+    @patch.object(utils, 'get_lvs')
+    def test_find_least_used_utility_device_lvs(self, _get_lvs):
+        _get_lvs.side_effect = lambda dev: self._parts.get(dev, [])
+        self.assertEqual(
+            utils.find_least_used_utility_device(['/dev/sdb',
+                                                  '/dev/sdx',
+                                                  '/dev/sdc'],
+                                                 lvs=True),
+            '/dev/sdx'
+        )
+        self.assertEqual(
+            utils.find_least_used_utility_device(['/dev/sdb', '/dev/sdc'],
+                                                 lvs=True),
+            '/dev/sdc'
+        )
+        self.assertEqual(
+            utils.find_least_used_utility_device(['/dev/sdb'],
+                                                 lvs=True),
+            '/dev/sdb'
+        )
+        _get_lvs.assert_called()
+
+
+class CephGetLVSTestCase(unittest.TestCase):
+
+    _lvs = {
+        'testvg': ['lv1', 'lv2', 'lv3']
+    }
+
+    @patch.object(utils, 'lvm')
+    def test_get_lvs(self, _lvm):
+        _lvm.is_lvm_physical_volume.return_value = True
+        _lvm.list_lvm_volume_group.return_value = 'testvg'
+        _lvm.list_logical_volumes.side_effect = (
+            lambda vg: self._lvs.get(vg.lstrip('vg_name='), [])
+        )
+        self.assertEqual(utils.get_lvs('/dev/sdb'),
+                         self._lvs['testvg'])
+        _lvm.is_lvm_physical_volume.assert_called_with(
+            utils._partition_name('/dev/sdb')
+        )
+        _lvm.list_lvm_volume_group.assert_called_with(
+            utils._partition_name('/dev/sdb')
+        )
+        _lvm.list_logical_volumes.assert_called_with('vg_name=testvg')
+
+    @patch.object(utils, 'lvm')
+    def test_get_lvs_no_lvs(self, _lvm):
+        _lvm.is_lvm_physical_volume.return_value = True
+        _lvm.list_lvm_volume_group.return_value = 'missingvg'
+        _lvm.list_logical_volumes.side_effect = (
+            lambda vg: self._lvs.get(vg.lstrip('vg_name='), [])
+        )
+        self.assertEqual(utils.get_lvs('/dev/sdb'), [])
+        _lvm.is_lvm_physical_volume.assert_called_with(
+            utils._partition_name('/dev/sdb')
+        )
+        _lvm.list_lvm_volume_group.assert_called_with(
+            utils._partition_name('/dev/sdb')
+        )
+        _lvm.list_logical_volumes.assert_called_with('vg_name=missingvg')
+
+    @patch.object(utils, 'lvm')
+    def test_get_lvs_no_pv(self, _lvm):
+        _lvm.is_lvm_physical_volume.return_value = False
+        self.assertEqual(utils.get_lvs('/dev/sdb'), [])
+        _lvm.is_lvm_physical_volume.assert_called_with(
+            utils._partition_name('/dev/sdb')
+        )
