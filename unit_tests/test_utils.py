@@ -67,12 +67,13 @@ class CephTestCase(unittest.TestCase):
             call(['udevadm', 'settle']),
         ])
 
+    @patch.object(utils, 'kv')
     @patch.object(utils.subprocess, 'check_call')
     @patch.object(utils.os.path, 'exists')
     @patch.object(utils, 'is_device_mounted')
     @patch.object(utils, 'cmp_pkgrevno')
     @patch.object(utils, 'is_block_device')
-    def test_osdize_dev(self, _is_blk, _cmp, _mounted, _exists, _call):
+    def test_osdize_dev(self, _is_blk, _cmp, _mounted, _exists, _call, _kv):
         """Test that the dev osd is initialized correctly"""
         _is_blk.return_value = True
         _mounted.return_value = False
