@@ -67,6 +67,7 @@ class CephTestCase(unittest.TestCase):
             call(['udevadm', 'settle']),
         ])
 
+    @patch.object(utils, 'kv')
     @patch.object(utils.subprocess, 'check_call')
     @patch.object(utils, 'zap_disk')
     @patch.object(utils, '_ceph_disk')
@@ -77,8 +78,11 @@ class CephTestCase(unittest.TestCase):
     @patch.object(utils, 'is_block_device')
     def test_osdize_dev_ceph_disk(self, _is_blk, _cmp, _mounted, _exists,
                                   _is_active_bluestore_device, _ceph_disk,
-                                  _zap_disk, _check_call):
+                                  _zap_disk, _check_call, _kv):
         """Test that _ceph_disk is called for < Luminous 12.2.4"""
+        db = MagicMock()
+        _kv.return_value = db
+        db.get.return_value = []
         _is_blk.return_value = True
         _mounted.return_value = False
         _exists.return_value = True
@@ -90,7 +94,11 @@ class CephTestCase(unittest.TestCase):
         _ceph_disk.assert_called_with('/dev/sdb', 'xfs', None, False, False)
         _check_call.assert_called_with(['ceph-disk', 'prepare'])
         _zap_disk.assert_called_once()
+        db.get.assert_called_with('osd-devices', [])
+        db.set.assert_called_with('osd-devices', ['/dev/sdb'])
+        db.flush.assert_called_once()
 
+    @patch.object(utils, 'kv')
     @patch.object(utils.subprocess, 'check_call')
     @patch.object(utils, 'zap_disk')
     @patch.object(utils, '_ceph_volume')
@@ -101,8 +109,11 @@ class CephTestCase(unittest.TestCase):
     @patch.object(utils, 'is_block_device')
     def test_osdize_dev_ceph_volume(self, _is_blk, _cmp, _mounted, _exists,
                                     _is_active_bluestore_device, _ceph_volume,
-                                    _zap_disk, _check_call):
+                                    _zap_disk, _check_call, _kv):
         """Test that _ceph_volume is called for >= Luminous 12.2.4"""
+        db = MagicMock()
+        _kv.return_value = db
+        db.get.return_value = []
         _is_blk.return_value = True
         _mounted.return_value = False
         _exists.return_value = True
@@ -114,6 +125,20 @@ class CephTestCase(unittest.TestCase):
         _ceph_volume.assert_called_with('/dev/sdb', None, False, False)
         _check_call.assert_called_with(['ceph-volume', 'prepare'])
         _zap_disk.assert_called_once()
+        db.get.assert_called_with('osd-devices', [])
+        db.set.assert_called_with('osd-devices', ['/dev/sdb'])
+        db.flush.assert_called_once()
+
+    @patch.object(utils, 'kv')
+    def test_osdize_dev_already_processed(self, _kv):
+        """Ensure that previously processed disks are skipped"""
+        db = MagicMock()
+        _kv.return_value = db
+        utils.osdize('/dev/sdb', osd_format='xfs', osd_journal=None,
+                     reformat_osd=True, bluestore=False)
+        db.get.return_value = ['/dev/sdb']
+        db.get.assert_called_with('osd-devices', [])
+        db.set.assert_not_called()
 
     @patch.object(utils.subprocess, 'check_call')
     @patch.object(utils.os.path, 'exists')
