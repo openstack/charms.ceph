@@ -87,7 +87,8 @@ PEON = 'peon'
 QUORUM = [LEADER, PEON]
 
 PACKAGES = ['ceph', 'gdisk', 'ntp', 'btrfs-tools', 'python-ceph',
-            'radosgw', 'xfsprogs', 'python-pyudev']
+            'radosgw', 'xfsprogs', 'python-pyudev',
+            'lvm2', 'parted']
 
 LinkSpeed = {
     "BASE_10": 10,
