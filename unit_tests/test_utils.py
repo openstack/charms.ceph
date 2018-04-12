@@ -122,7 +122,7 @@ class CephTestCase(unittest.TestCase):
         _is_active_bluestore_device.return_value = False
         utils.osdize('/dev/sdb', osd_format='xfs', osd_journal=None,
                      reformat_osd=True, bluestore=False)
-        _ceph_volume.assert_called_with('/dev/sdb', None, False, False)
+        _ceph_volume.assert_called_with('/dev/sdb', None, False, False, 'ceph')
         _check_call.assert_called_with(['ceph-volume', 'prepare'])
         _zap_disk.assert_called_once()
         db.get.assert_called_with('osd-devices', [])
@@ -653,11 +653,15 @@ class CephVolumeSizeCalculatorTestCase(unittest.TestCase):
 
 class CephInitializeDiskTestCase(unittest.TestCase):
 
+    @patch.object(utils, '_luks_uuid')
     @patch.object(utils.subprocess, 'check_call')
     @patch.object(utils.os.path, 'exists')
-    def test_initialize_disk(self, _exists, _check_call):
+    def test_initialize_disk(self, _exists, _check_call,
+                             _luks_uuid):
         _exists.return_value = False
-        self.assertEqual(utils._initialize_disk('/dev/sdb'),
+        _luks_uuid.return_value = None
+        self.assertEqual(utils._initialize_disk('/dev/sdb',
+                                                'test-UUID'),
                          '/dev/sdb1')
         _check_call.assert_has_calls([
             call([
@@ -674,11 +678,61 @@ class CephInitializeDiskTestCase(unittest.TestCase):
             ]),
         ])
 
+    @patch.object(utils, '_luks_uuid')
     @patch.object(utils.subprocess, 'check_call')
     @patch.object(utils.os.path, 'exists')
-    def test_initialize_disk_exists(self, _exists, _check_call):
+    def test_initialize_disk_vaultlocker(self, _exists, _check_call,
+                                         _luks_uuid):
+        _exists.return_value = False
+        _luks_uuid.return_value = None
+        self.assertEqual(utils._initialize_disk('/dev/sdb',
+                                                'test-UUID',
+                                                True,
+                                                'vault'),
+                         '/dev/mapper/crypt-test-UUID')
+        _check_call.assert_has_calls([
+            call([
+                'parted', '--script',
+                '/dev/sdb',
+                'mklabel',
+                'gpt',
+            ]),
+            call([
+                'parted', '--script',
+                '/dev/sdb',
+                'mkpart',
+                'primary', '1', '100%',
+            ]),
+            call(['vaultlocker', 'encrypt',
+                  '--uuid', 'test-UUID',
+                  '/dev/sdb1']),
+        ])
+
+    @patch.object(utils, '_luks_uuid')
+    @patch.object(utils.subprocess, 'check_call')
+    @patch.object(utils.os.path, 'exists')
+    def test_initialize_disk_vaultlocker_encrypted(self,
+                                                   _exists,
+                                                   _check_call,
+                                                   _luks_uuid):
         _exists.return_value = True
-        self.assertEqual(utils._initialize_disk('/dev/sdb'),
+        _luks_uuid.return_value = 'existing-UUID'
+        self.assertEqual(utils._initialize_disk('/dev/sdb',
+                                                'test-UUID',
+                                                True,
+                                                'vault'),
+                         '/dev/mapper/crypt-existing-UUID')
+        _check_call.assert_not_called()
+
+    @patch.object(utils, '_luks_uuid')
+    @patch.object(utils.subprocess, 'check_call')
+    @patch.object(utils.os.path, 'exists')
+    def test_initialize_disk_exists(self, _exists, _check_call,
+                                    _luks_uuid):
+        _exists.return_value = True
+        _luks_uuid.return_value = None
+        self.assertEqual(utils._initialize_disk('/dev/sdb',
+                                                'test-UUID'),
                          '/dev/sdb1')
         _check_call.assert_not_called()
 
@@ -759,7 +813,8 @@ class CephAllocateVolumeTestCase(unittest.TestCase):
     @patch.object(utils, 'lvm')
     def _test_allocate_logical_volume(self, _lvm, _uuid4, _initialize_disk,
                                       dev, lv_type, osd_fsid,
-                                      size=None, shared=False):
+                                      size=None, shared=False, encrypt=False,
+                                      key_manager='ceph'):
         test_uuid = '1234-1234-1234-1234'
         pv_dev = utils._partition_name(dev)
 
@@ -794,7 +849,12 @@ class CephAllocateVolumeTestCase(unittest.TestCase):
         else:
             _lvm.create_logical_volume.assert_not_called()
 
-        _initialize_disk.assert_called_with(dev)
+        _initialize_disk.assert_called_with(
+            dev,
+            osd_fsid if not shared else test_uuid,
+            encrypt,
+            key_manager
+        )
 
     def test_allocate_lv_already_pv(self):
         self._test_allocate_logical_volume(dev='/dev/sdb', lv_type='data',
@@ -945,9 +1005,8 @@ class CephVolumeTestCase(unittest.TestCase):
         _calculate_volume_size.return_value = 1024
         _uuid4.return_value = self._osd_uuid
         _allocate_logical_volume.side_effect = (
-            lambda dev, lv_type, osd_fsid, size=None, shared=False: (
-                'ceph-{fsid}/osd-{type}-{fsid}'.format(fsid=osd_fsid,
-                                                       type=lv_type)
+            lambda *args, **kwargs: (
+                'ceph-{osd_fsid}/osd-{lv_type}-{osd_fsid}'.format(**kwargs)
             )
         )
         self.assertEqual(
@@ -969,8 +1028,12 @@ class CephVolumeTestCase(unittest.TestCase):
               'osd-data-{fsid}').format(fsid=self._osd_uuid)]
         )
         _allocate_logical_volume.assert_has_calls([
-            call('/dev/sdb', 'journal', self._osd_uuid, size='1024M'),
-            call('/dev/sdb', 'data', self._osd_uuid),
+            call(dev='/dev/sdb', lv_type='journal',
+                 osd_fsid=self._osd_uuid, size='1024M',
+                 encrypt=False, key_manager='ceph'),
+            call(dev='/dev/sdb', lv_type='data',
+                 osd_fsid=self._osd_uuid,
+                 encrypt=False, key_manager='ceph'),
         ])
         _find_least_used_utility_device.assert_not_called()
         _calculate_volume_size.assert_called_with('journal')
@@ -989,9 +1052,8 @@ class CephVolumeTestCase(unittest.TestCase):
         _calculate_volume_size.return_value = 1024
         _uuid4.return_value = self._osd_uuid
         _allocate_logical_volume.side_effect = (
-            lambda dev, lv_type, osd_fsid, size=None, shared=False: (
-                'ceph-{fsid}/osd-{type}-{fsid}'.format(fsid=osd_fsid,
-                                                       type=lv_type)
+            lambda *args, **kwargs: (
+                'ceph-{osd_fsid}/osd-{lv_type}-{osd_fsid}'.format(**kwargs)
             )
         )
         self.assertEqual(
@@ -1013,9 +1075,13 @@ class CephVolumeTestCase(unittest.TestCase):
               'osd-journal-{fsid}').format(fsid=self._osd_uuid)]
         )
         _allocate_logical_volume.assert_has_calls([
-            call('/dev/sdb', 'data', self._osd_uuid),
-            call('/dev/sdc', 'journal', self._osd_uuid,
-                 shared=True, size='1024M'),
+            call(dev='/dev/sdb', lv_type='data',
+                 osd_fsid=self._osd_uuid,
+                 encrypt=False, key_manager='ceph'),
+            call(dev='/dev/sdc', lv_type='journal',
+                 osd_fsid=self._osd_uuid,
+                 shared=True, size='1024M',
+                 encrypt=False, key_manager='ceph'),
         ])
         _find_least_used_utility_device.assert_has_calls([
             call(['/dev/sdc'], lvs=True),
@@ -1037,9 +1103,8 @@ class CephVolumeTestCase(unittest.TestCase):
         _calculate_volume_size.return_value = 1024
         _uuid4.return_value = self._osd_uuid
         _allocate_logical_volume.side_effect = (
-            lambda dev, lv_type, osd_fsid, size=None, shared=False: (
-                'ceph-{fsid}/osd-{type}-{fsid}'.format(fsid=osd_fsid,
-                                                       type=lv_type)
+            lambda *args, **kwargs: (
+                'ceph-{osd_fsid}/osd-{lv_type}-{osd_fsid}'.format(**kwargs)
             )
         )
         self.assertEqual(
@@ -1058,7 +1123,9 @@ class CephVolumeTestCase(unittest.TestCase):
               'osd-block-{fsid}').format(fsid=self._osd_uuid)]
         )
         _allocate_logical_volume.assert_has_calls([
-            call('/dev/sdb', 'block', self._osd_uuid),
+            call(dev='/dev/sdb', lv_type='block',
+                 osd_fsid=self._osd_uuid,
+                 encrypt=False, key_manager='ceph'),
         ])
         _find_least_used_utility_device.assert_not_called()
         _calculate_volume_size.assert_not_called()
@@ -1082,9 +1149,8 @@ class CephVolumeTestCase(unittest.TestCase):
         _calculate_volume_size.return_value = 1024
         _uuid4.return_value = self._osd_uuid
         _allocate_logical_volume.side_effect = (
-            lambda dev, lv_type, osd_fsid, size=None, shared=False: (
-                'ceph-{fsid}/osd-{type}-{fsid}'.format(fsid=osd_fsid,
-                                                       type=lv_type)
+            lambda *args, **kwargs: (
+                'ceph-{osd_fsid}/osd-{lv_type}-{osd_fsid}'.format(**kwargs)
             )
         )
         self.assertEqual(
@@ -1109,11 +1175,17 @@ class CephVolumeTestCase(unittest.TestCase):
               'osd-db-{fsid}').format(fsid=self._osd_uuid)]
         )
         _allocate_logical_volume.assert_has_calls([
-            call('/dev/sdb', 'block', self._osd_uuid),
-            call('/dev/sdd', 'wal', self._osd_uuid,
-                 shared=True, size='1024M'),
-            call('/dev/sdc', 'db', self._osd_uuid,
-                 shared=True, size='1024M'),
+            call(dev='/dev/sdb', lv_type='block',
+                 osd_fsid=self._osd_uuid,
+                 encrypt=False, key_manager='ceph'),
+            call(dev='/dev/sdd', lv_type='wal',
+                 osd_fsid=self._osd_uuid,
+                 shared=True, size='1024M',
+                 encrypt=False, key_manager='ceph'),
+            call(dev='/dev/sdc', lv_type='db',
+                 osd_fsid=self._osd_uuid,
+                 shared=True, size='1024M',
+                 encrypt=False, key_manager='ceph'),
         ])
         _find_least_used_utility_device.assert_has_calls([
             call(['/dev/sdd'], lvs=True),
