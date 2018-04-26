@@ -134,9 +134,9 @@ class CephTestCase(unittest.TestCase):
         """Ensure that previously processed disks are skipped"""
         db = MagicMock()
         _kv.return_value = db
+        db.get.return_value = ['/dev/sdb']
         utils.osdize('/dev/sdb', osd_format='xfs', osd_journal=None,
                      reformat_osd=True, bluestore=False)
-        db.get.return_value = ['/dev/sdb']
         db.get.assert_called_with('osd-devices', [])
         db.set.assert_not_called()
 
