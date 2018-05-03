@@ -662,21 +662,8 @@ class CephInitializeDiskTestCase(unittest.TestCase):
         _luks_uuid.return_value = None
         self.assertEqual(utils._initialize_disk('/dev/sdb',
                                                 'test-UUID'),
-                         '/dev/sdb1')
-        _check_call.assert_has_calls([
-            call([
-                'parted', '--script',
-                '/dev/sdb',
-                'mklabel',
-                'gpt',
-            ]),
-            call([
-                'parted', '--script',
-                '/dev/sdb',
-                'mkpart',
-                'primary', '1', '100%',
-            ]),
-        ])
+                         '/dev/sdb')
+        _check_call.assert_not_called()
 
     @patch.object(utils, '_luks_uuid')
     @patch.object(utils.subprocess, 'check_call')
@@ -690,23 +677,11 @@ class CephInitializeDiskTestCase(unittest.TestCase):
                                                 True,
                                                 'vault'),
                          '/dev/mapper/crypt-test-UUID')
-        _check_call.assert_has_calls([
-            call([
-                'parted', '--script',
-                '/dev/sdb',
-                'mklabel',
-                'gpt',
-            ]),
-            call([
-                'parted', '--script',
-                '/dev/sdb',
-                'mkpart',
-                'primary', '1', '100%',
-            ]),
-            call(['vaultlocker', 'encrypt',
-                  '--uuid', 'test-UUID',
-                  '/dev/sdb1']),
-        ])
+        _check_call.assert_called_once_with(
+            ['vaultlocker', 'encrypt',
+             '--uuid', 'test-UUID',
+             '/dev/sdb']
+        )
 
     @patch.object(utils, '_luks_uuid')
     @patch.object(utils.subprocess, 'check_call')
@@ -722,18 +697,6 @@ class CephInitializeDiskTestCase(unittest.TestCase):
                                                 True,
                                                 'vault'),
                          '/dev/mapper/crypt-existing-UUID')
-        _check_call.assert_not_called()
-
-    @patch.object(utils, '_luks_uuid')
-    @patch.object(utils.subprocess, 'check_call')
-    @patch.object(utils.os.path, 'exists')
-    def test_initialize_disk_exists(self, _exists, _check_call,
-                                    _luks_uuid):
-        _exists.return_value = True
-        _luks_uuid.return_value = None
-        self.assertEqual(utils._initialize_disk('/dev/sdb',
-                                                'test-UUID'),
-                         '/dev/sdb1')
         _check_call.assert_not_called()
 
 

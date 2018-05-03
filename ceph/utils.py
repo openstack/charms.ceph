@@ -1822,8 +1822,8 @@ def _luks_uuid(dev):
 def _initialize_disk(dev, dev_uuid, encrypt=False,
                      key_manager=CEPH_KEY_MANAGER):
     """
-    Initialize a raw block device with a single paritition
-    consuming 100% of the avaliable disk space.
+    Initialize a raw block device consuming 100% of the avaliable
+    disk space.
 
     Function assumes that block device has already been wiped.
 
@@ -1834,45 +1834,30 @@ def _initialize_disk(dev, dev_uuid, encrypt=False,
     :raises: subprocess.CalledProcessError: if any parted calls fail
     :returns: str: Full path to new partition.
     """
-    partition = _partition_name(dev)
     use_vaultlocker = encrypt and key_manager == VAULT_KEY_MANAGER
 
     if use_vaultlocker:
         # NOTE(jamespage): Check to see if already initialized as a LUKS
         #                  volume, which indicates this is a shared block
         #                  device for journal, db or wal volumes.
-        luks_uuid = _luks_uuid(partition)
+        luks_uuid = _luks_uuid(dev)
         if luks_uuid:
             return '/dev/mapper/crypt-{}'.format(luks_uuid)
 
     dm_crypt = '/dev/mapper/crypt-{}'.format(dev_uuid)
-
-    if not os.path.exists(partition):
-        subprocess.check_call([
-            'parted', '--script',
-            dev,
-            'mklabel',
-            'gpt',
-        ])
-        subprocess.check_call([
-            'parted', '--script',
-            dev,
-            'mkpart',
-            'primary', '1', '100%',
-        ])
 
     if use_vaultlocker and not os.path.exists(dm_crypt):
         subprocess.check_call([
             'vaultlocker',
             'encrypt',
             '--uuid', dev_uuid,
-            partition,
+            dev,
         ])
 
     if use_vaultlocker:
         return dm_crypt
     else:
-        return partition
+        return dev
 
 
 def _allocate_logical_volume(dev, lv_type, osd_fsid,
