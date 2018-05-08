@@ -703,9 +703,9 @@ class CephInitializeDiskTestCase(unittest.TestCase):
 class CephActiveBlueStoreDeviceTestCase(unittest.TestCase):
 
     _test_pvs = {
-        '/dev/sdb1': 'ceph-1234',
-        '/dev/sdc1': 'ceph-5678',
-        '/dev/sde1': 'ceph-9101',
+        '/dev/sdb': 'ceph-1234',
+        '/dev/sdc': 'ceph-5678',
+        '/dev/sde': 'ceph-9101',
     }
 
     _test_vgs = {
@@ -737,15 +737,14 @@ class CephActiveBlueStoreDeviceTestCase(unittest.TestCase):
         _os.readlink.side_effect = (
             lambda link: self._test_links.get(link)
         )
-        pv_dev = utils._partition_name(device)
 
         self.assertEqual(utils.is_active_bluestore_device(device),
                          active)
-        _lvm.is_lvm_physical_volume.assert_called_with(pv_dev)
-        if pv_dev in self._test_pvs:
-            _lvm.list_lvm_volume_group.assert_called_with(pv_dev)
+        _lvm.is_lvm_physical_volume.assert_called_with(device)
+        if device in self._test_pvs:
+            _lvm.list_lvm_volume_group.assert_called_with(device)
             _lvm.list_logical_volumes.assert_called_with(
-                'vg_name={}'.format(self._test_pvs.get(pv_dev))
+                'vg_name={}'.format(self._test_pvs.get(device))
             )
             _glob.glob.assert_called_with('/var/lib/ceph/osd/ceph-*/block')
         else:
@@ -768,7 +767,7 @@ class CephAllocateVolumeTestCase(unittest.TestCase):
 
     _lvs = ['osd-data-1234', 'osd-block-1234', 'osd-journal-1234']
     _vgs = {
-        '/dev/sdb1': 'ceph-1234'
+        '/dev/sdb': 'ceph-1234'
     }
 
     @patch.object(utils, '_initialize_disk')
@@ -1248,10 +1247,10 @@ class CephGetLVSTestCase(unittest.TestCase):
         self.assertEqual(utils.get_lvs('/dev/sdb'),
                          self._lvs['testvg'])
         _lvm.is_lvm_physical_volume.assert_called_with(
-            utils._partition_name('/dev/sdb')
+            '/dev/sdb'
         )
         _lvm.list_lvm_volume_group.assert_called_with(
-            utils._partition_name('/dev/sdb')
+            '/dev/sdb'
         )
         _lvm.list_logical_volumes.assert_called_with('vg_name=testvg')
 
@@ -1264,10 +1263,10 @@ class CephGetLVSTestCase(unittest.TestCase):
         )
         self.assertEqual(utils.get_lvs('/dev/sdb'), [])
         _lvm.is_lvm_physical_volume.assert_called_with(
-            utils._partition_name('/dev/sdb')
+            '/dev/sdb'
         )
         _lvm.list_lvm_volume_group.assert_called_with(
-            utils._partition_name('/dev/sdb')
+            '/dev/sdb'
         )
         _lvm.list_logical_volumes.assert_called_with('vg_name=missingvg')
 
@@ -1276,5 +1275,5 @@ class CephGetLVSTestCase(unittest.TestCase):
         _lvm.is_lvm_physical_volume.return_value = False
         self.assertEqual(utils.get_lvs('/dev/sdb'), [])
         _lvm.is_lvm_physical_volume.assert_called_with(
-            utils._partition_name('/dev/sdb')
+            '/dev/sdb'
         )

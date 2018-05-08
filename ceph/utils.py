@@ -1427,10 +1427,9 @@ def get_lvs(dev):
                                            operation failed.
     :returns: list: List of logical volumes provided by the block device
     """
-    pv_dev = _partition_name(dev)
-    if not lvm.is_lvm_physical_volume(pv_dev):
+    if not lvm.is_lvm_physical_volume(dev):
         return []
-    vg_name = lvm.list_lvm_volume_group(pv_dev)
+    vg_name = lvm.list_lvm_volume_group(dev)
     return lvm.list_logical_volumes('vg_name={}'.format(vg_name))
 
 
@@ -1725,7 +1724,6 @@ def _partition_name(dev):
         return '{}1'.format(dev)
 
 
-# TODO(jamespage): Deal with lockbox encrypted bluestore devices.
 def is_active_bluestore_device(dev):
     """
     Determine whether provided device is part of an active
@@ -1734,11 +1732,10 @@ def is_active_bluestore_device(dev):
     :param: dev: Full path to block device to check for Bluestore usage.
     :returns: boolean: indicating whether device is in active use.
     """
-    pv_dev = _partition_name(dev)
-    if not lvm.is_lvm_physical_volume(pv_dev):
+    if not lvm.is_lvm_physical_volume(dev):
         return False
 
-    vg_name = lvm.list_lvm_volume_group(pv_dev)
+    vg_name = lvm.list_lvm_volume_group(dev)
     lv_name = lvm.list_logical_volumes('vg_name={}'.format(vg_name))[0]
 
     block_symlinks = glob.glob('/var/lib/ceph/osd/ceph-*/block')
