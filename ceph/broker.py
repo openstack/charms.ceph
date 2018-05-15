@@ -81,6 +81,10 @@ POOL_KEYS = {
     "cache_min_flush_age": [int],
     "cache_min_evict_age": [int],
     "fast_read": [bool],
+    "allow_ec_overwrites": [bool],
+    "compression_mode": [str, ["none", "passive", "aggressive", "force"]],
+    "compression_algorithm": [str, ["lz4", "snappy", "zlib", "zstd"]],
+    "compression_required_ratio": [float, [0.0, 1.0]],
 }
 
 CEPH_BUCKET_TYPES = [
