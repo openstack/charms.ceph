@@ -69,7 +69,6 @@ class CephTestCase(unittest.TestCase):
 
     @patch.object(utils, 'kv')
     @patch.object(utils.subprocess, 'check_call')
-    @patch.object(utils, 'zap_disk')
     @patch.object(utils, '_ceph_disk')
     @patch.object(utils, 'is_active_bluestore_device')
     @patch.object(utils.os.path, 'exists')
@@ -78,7 +77,7 @@ class CephTestCase(unittest.TestCase):
     @patch.object(utils, 'is_block_device')
     def test_osdize_dev_ceph_disk(self, _is_blk, _cmp, _mounted, _exists,
                                   _is_active_bluestore_device, _ceph_disk,
-                                  _zap_disk, _check_call, _kv):
+                                  _check_call, _kv):
         """Test that _ceph_disk is called for < Luminous 12.2.4"""
         db = MagicMock()
         _kv.return_value = db
@@ -90,17 +89,15 @@ class CephTestCase(unittest.TestCase):
         _ceph_disk.return_value = ['ceph-disk', 'prepare']
         _is_active_bluestore_device.return_value = False
         utils.osdize('/dev/sdb', osd_format='xfs', osd_journal=None,
-                     reformat_osd=True, bluestore=False)
+                     bluestore=False)
         _ceph_disk.assert_called_with('/dev/sdb', 'xfs', None, False, False)
         _check_call.assert_called_with(['ceph-disk', 'prepare'])
-        _zap_disk.assert_called_once()
         db.get.assert_called_with('osd-devices', [])
         db.set.assert_called_with('osd-devices', ['/dev/sdb'])
         db.flush.assert_called_once()
 
     @patch.object(utils, 'kv')
     @patch.object(utils.subprocess, 'check_call')
-    @patch.object(utils, 'zap_disk')
     @patch.object(utils, '_ceph_volume')
     @patch.object(utils, 'is_active_bluestore_device')
     @patch.object(utils.os.path, 'exists')
@@ -109,7 +106,7 @@ class CephTestCase(unittest.TestCase):
     @patch.object(utils, 'is_block_device')
     def test_osdize_dev_ceph_volume(self, _is_blk, _cmp, _mounted, _exists,
                                     _is_active_bluestore_device, _ceph_volume,
-                                    _zap_disk, _check_call, _kv):
+                                    _check_call, _kv):
         """Test that _ceph_volume is called for >= Luminous 12.2.4"""
         db = MagicMock()
         _kv.return_value = db
@@ -121,10 +118,9 @@ class CephTestCase(unittest.TestCase):
         _ceph_volume.return_value = ['ceph-volume', 'prepare']
         _is_active_bluestore_device.return_value = False
         utils.osdize('/dev/sdb', osd_format='xfs', osd_journal=None,
-                     reformat_osd=True, bluestore=False)
+                     bluestore=False)
         _ceph_volume.assert_called_with('/dev/sdb', None, False, False, 'ceph')
         _check_call.assert_called_with(['ceph-volume', 'prepare'])
-        _zap_disk.assert_called_once()
         db.get.assert_called_with('osd-devices', [])
         db.set.assert_called_with('osd-devices', ['/dev/sdb'])
         db.flush.assert_called_once()
@@ -136,7 +132,7 @@ class CephTestCase(unittest.TestCase):
         _kv.return_value = db
         db.get.return_value = ['/dev/sdb']
         utils.osdize('/dev/sdb', osd_format='xfs', osd_journal=None,
-                     reformat_osd=True, bluestore=False)
+                     bluestore=False)
         db.get.assert_called_with('osd-devices', [])
         db.set.assert_not_called()
 
@@ -1277,3 +1273,34 @@ class CephGetLVSTestCase(unittest.TestCase):
         _lvm.is_lvm_physical_volume.assert_called_with(
             '/dev/sdb'
         )
+
+    @patch.object(utils, 'log')
+    def test_is_pristine_disk(self, _log):
+        data = b'\0' * 2048
+        fake_open = mock_open(read_data=data)
+        with patch('ceph.utils.open', fake_open):
+            result = utils.is_pristine_disk('/dev/vdz')
+        fake_open.assert_called_with('/dev/vdz', 'rb')
+        self.assertFalse(_log.called)
+        self.assertEqual(result, True)
+
+    @patch.object(utils, 'log')
+    def test_is_pristine_disk_short_read(self, _log):
+        data = b'\0' * 2047
+        fake_open = mock_open(read_data=data)
+        with patch('ceph.utils.open', fake_open):
+            result = utils.is_pristine_disk('/dev/vdz')
+        fake_open.assert_called_with('/dev/vdz', 'rb')
+        _log.assert_called_with(
+            '/dev/vdz: short read, got 2047 bytes expected 2048.',
+            level='WARNING')
+        self.assertEqual(result, False)
+
+    def test_is_pristine_disk_dirty_disk(self):
+        data = b'\0' * 2047
+        data = data + b'\42'
+        fake_open = mock_open(read_data=data)
+        with patch('ceph.utils.open', fake_open):
+            result = utils.is_pristine_disk('/dev/vdz')
+        fake_open.assert_called_with('/dev/vdz', 'rb')
+        self.assertEqual(result, False)
