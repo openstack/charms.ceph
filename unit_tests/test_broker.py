@@ -34,9 +34,11 @@ class CephBrokerTestCase(unittest.TestCase):
         }
         ceph.broker.update_service_permissions(service='nova',
                                                service_obj=service_obj)
-        _check_call.assert_called_with(['ceph', 'auth', 'caps',
-                                        'client.nova', 'mon', 'allow r', 'osd',
-                                        'allow rwx pool=cinder'])
+        _check_call.assert_called_with(
+            ['ceph', 'auth', 'caps',
+             'client.nova',
+             'mon', 'allow r, allow command "osd blacklist"',
+             'osd', 'allow rwx pool=cinder'])
 
     @patch.object(ceph.broker, 'check_call')
     @patch.object(ceph.broker, 'get_service_groups')
@@ -67,8 +69,9 @@ class CephBrokerTestCase(unittest.TestCase):
                               "services": ["nova"]}, sort_keys=True))
         _check_call.assert_called_with([
             'ceph', 'auth', 'caps',
-            'client.nova', 'mon', 'allow r', 'osd',
-            'allow rwx pool=glance, allow rwx pool=cinder'])
+            'client.nova',
+            'mon', 'allow r, allow command "osd blacklist"',
+            'osd', 'allow rwx pool=glance, allow rwx pool=cinder'])
 
     @patch.object(ceph.broker, 'monitor_key_set')
     @patch.object(ceph.broker, 'monitor_key_get')
@@ -109,7 +112,7 @@ class CephBrokerTestCase(unittest.TestCase):
         }
         result = ceph.broker.pool_permission_list_for_service(service)
         self.assertEqual(result, ['mon',
-                                  'allow r',
+                                  'allow r, allow command "osd blacklist"',
                                   'osd',
                                   'allow rwx pool=glance'])
 
@@ -132,7 +135,7 @@ class CephBrokerTestCase(unittest.TestCase):
             result,
             [
                 'mon',
-                'allow r',
+                'allow r, allow command "osd blacklist"',
                 'osd',
                 'allow r pool=p2, allow rwx pool=glance, allow rwx pool=p1'])
 
@@ -606,7 +609,7 @@ class CephBrokerTestCase(unittest.TestCase):
             expect_service_obj),
             [
                 'mon',
-                'allow r',
+                'allow r, allow command "osd blacklist"',
                 'osd',
                 ('allow rwx pool=glance, '
                  'allow r object_prefix another, '
@@ -630,7 +633,7 @@ class CephBrokerTestCase(unittest.TestCase):
             expect_service_obj),
             [
                 'mon',
-                'allow r',
+                'allow r, allow command "osd blacklist"',
                 'osd',
                 ('allow rwx pool=glance, '
                  'allow class-read object_prefix rbd_children')])

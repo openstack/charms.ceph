@@ -237,8 +237,8 @@ class CephTestCase(unittest.TestCase):
                   'mon.', '--keyring',
                   '/var/lib/ceph/mon/ceph-osd001/keyring',
                   'auth', 'get-or-create', 'client.rgw001',
-                  'mon', 'allow r', 'osd',
-                  'allow rwx pool=rbd pool=block'])])
+                  'mon', 'allow r; allow command "osd blacklist"',
+                  'osd', 'allow rwx pool=rbd pool=block'])])
 
     @patch.object(utils.subprocess, 'check_output')
     @patch.object(utils, 'ceph_user', lambda: "ceph")
@@ -255,8 +255,8 @@ class CephTestCase(unittest.TestCase):
                   'mon.', '--keyring',
                   '/var/lib/ceph/mon/ceph-osd001/keyring',
                   'auth', 'get-or-create', 'client.rgw001',
-                  'mon', 'allow r', 'osd',
-                  'allow rwx'])])
+                  'mon', 'allow r; allow command "osd blacklist"',
+                  'osd', 'allow rwx'])])
 
     def test_parse_key_with_caps_existing_key(self):
         expected = "AQCm7aVYQFXXFhAAj0WIeqcag88DKOvY4UKR/g=="
