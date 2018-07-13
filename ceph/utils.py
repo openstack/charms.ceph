@@ -1467,6 +1467,11 @@ def osdize_dev(dev, osd_format, osd_journal, ignore_errors=False,
             ' skipping.'.format(dev))
         return
 
+    if is_mapped_luks_device(dev):
+        log('{} is a mapped LUKS device,'
+            ' skipping.'.format(dev))
+        return
+
     if cmp_pkgrevno('ceph', '12.2.4') >= 0:
         cmd = _ceph_volume(dev,
                            osd_journal,
@@ -1676,6 +1681,29 @@ def is_active_bluestore_device(dev):
                 return True
 
     return False
+
+
+def is_luks_device(dev):
+    """
+    Determine if dev is a LUKS-formatted block device.
+
+    :param: dev: A full path to a block device to check for LUKS header
+    presence
+    :returns: boolean: indicates whether a device is used based on LUKS header.
+    """
+    return True if _luks_uuid(dev) else False
+
+
+def is_mapped_luks_device(dev):
+    """
+    Determine if dev is a mapped LUKS device
+    :param: dev: A full path to a block device to be checked
+    :returns: boolean: indicates whether a device is mapped
+    """
+    _, dirs, _ = next(os.walk('/sys/class/block/{}/holders/'
+                              .format(os.path.basename(dev))))
+    is_held = len(dirs) > 0
+    return is_held and is_luks_device(dev)
 
 
 def get_conf(variable):

@@ -70,13 +70,15 @@ class CephTestCase(unittest.TestCase):
     @patch.object(utils, 'kv')
     @patch.object(utils.subprocess, 'check_call')
     @patch.object(utils, '_ceph_disk')
+    @patch.object(utils, 'is_mapped_luks_device')
     @patch.object(utils, 'is_active_bluestore_device')
     @patch.object(utils.os.path, 'exists')
     @patch.object(utils, 'is_device_mounted')
     @patch.object(utils, 'cmp_pkgrevno')
     @patch.object(utils, 'is_block_device')
     def test_osdize_dev_ceph_disk(self, _is_blk, _cmp, _mounted, _exists,
-                                  _is_active_bluestore_device, _ceph_disk,
+                                  _is_active_bluestore_device,
+                                  _is_mapped_luks_device, _ceph_disk,
                                   _check_call, _kv):
         """Test that _ceph_disk is called for < Luminous 12.2.4"""
         db = MagicMock()
@@ -87,6 +89,7 @@ class CephTestCase(unittest.TestCase):
         _exists.return_value = True
         _cmp.return_value = -1
         _ceph_disk.return_value = ['ceph-disk', 'prepare']
+        _is_mapped_luks_device.return_value = False
         _is_active_bluestore_device.return_value = False
         utils.osdize('/dev/sdb', osd_format='xfs', osd_journal=None,
                      bluestore=False)
@@ -99,12 +102,14 @@ class CephTestCase(unittest.TestCase):
     @patch.object(utils, 'kv')
     @patch.object(utils.subprocess, 'check_call')
     @patch.object(utils, '_ceph_volume')
+    @patch.object(utils, 'is_mapped_luks_device')
     @patch.object(utils, 'is_active_bluestore_device')
     @patch.object(utils.os.path, 'exists')
     @patch.object(utils, 'is_device_mounted')
     @patch.object(utils, 'cmp_pkgrevno')
     @patch.object(utils, 'is_block_device')
     def test_osdize_dev_ceph_volume(self, _is_blk, _cmp, _mounted, _exists,
+                                    _is_mapped_luks_device,
                                     _is_active_bluestore_device, _ceph_volume,
                                     _check_call, _kv):
         """Test that _ceph_volume is called for >= Luminous 12.2.4"""
@@ -116,6 +121,7 @@ class CephTestCase(unittest.TestCase):
         _exists.return_value = True
         _cmp.return_value = 1
         _ceph_volume.return_value = ['ceph-volume', 'prepare']
+        _is_mapped_luks_device.return_value = False
         _is_active_bluestore_device.return_value = False
         utils.osdize('/dev/sdb', osd_format='xfs', osd_journal=None,
                      bluestore=False)
@@ -133,6 +139,36 @@ class CephTestCase(unittest.TestCase):
         db.get.return_value = ['/dev/sdb']
         utils.osdize('/dev/sdb', osd_format='xfs', osd_journal=None,
                      bluestore=False)
+        db.get.assert_called_with('osd-devices', [])
+        db.set.assert_not_called()
+
+    @patch.object(utils, 'kv')
+    @patch.object(utils.subprocess, 'check_call')
+    @patch.object(utils, '_ceph_volume')
+    @patch.object(utils, 'is_mapped_luks_device')
+    @patch.object(utils, 'is_active_bluestore_device')
+    @patch.object(utils.os.path, 'exists')
+    @patch.object(utils, 'is_device_mounted')
+    @patch.object(utils, 'cmp_pkgrevno')
+    @patch.object(utils, 'is_block_device')
+    def test_osdize_already_processed_luks_bluestore(
+            self, _is_blk, _cmp, _mounted,
+            _exists,
+            _is_active_bluestore_device, _is_mapped_luks_device,
+            _ceph_volume, _check_call, _kv):
+        """Test that _ceph_volume is called for >= Luminous 12.2.4"""
+        db = MagicMock()
+        _kv.return_value = db
+        db.get.return_value = []
+        _is_blk.return_value = True
+        _mounted.return_value = False
+        _exists.return_value = True
+        _cmp.return_value = 1
+        _ceph_volume.return_value = ['ceph-volume', 'prepare']
+        _is_active_bluestore_device.return_value = False
+        _is_mapped_luks_device.return_value = True
+        utils.osdize('/dev/sdb', encrypt=True, osd_format=None,
+                     osd_journal=None, bluestore=True, key_manager='vault')
         db.get.assert_called_with('osd-devices', [])
         db.set.assert_not_called()
 
@@ -757,6 +793,78 @@ class CephActiveBlueStoreDeviceTestCase(unittest.TestCase):
 
     def test_active_bluestore_device_inactive_not_inuse(self):
         self._test_active_bluestore_device(device='/dev/sde', active=False)
+
+
+class CephLUKSDeviceTestCase(unittest.TestCase):
+
+    @patch.object(utils, '_luks_uuid')
+    def test_no_luks_header(self, _luks_uuid):
+        _luks_uuid.return_value = None
+        self.assertEqual(utils.is_luks_device('/dev/sdb'), False)
+
+    @patch.object(utils, '_luks_uuid')
+    def test_luks_header(self, _luks_uuid):
+        _luks_uuid.return_value = '5e1e4c89-4f68-4b9a-bd93-e25eec34e80f'
+        self.assertEqual(utils.is_luks_device('/dev/sdb'), True)
+
+
+class CephMappedLUKSDeviceTestCase(unittest.TestCase):
+
+    @patch.object(utils.os, 'walk')
+    @patch.object(utils, '_luks_uuid')
+    def test_no_luks_header_not_mapped(self, _luks_uuid, _walk):
+        _luks_uuid.return_value = None
+
+        def os_walk_side_effect(path):
+            return {
+                '/sys/class/block/sdb/holders/': iter([('', [], [])]),
+            }[path]
+        _walk.side_effect = os_walk_side_effect
+
+        self.assertEqual(utils.is_mapped_luks_device('/dev/sdb'), False)
+
+    @patch.object(utils.os, 'walk')
+    @patch.object(utils, '_luks_uuid')
+    def test_luks_header_mapped(self, _luks_uuid, _walk):
+        _luks_uuid.return_value = 'db76d142-4782-42f2-84c6-914f9db889a0'
+
+        def os_walk_side_effect(path):
+            return {
+                '/sys/class/block/sdb/holders/': iter([('', ['dm-0'], [])]),
+            }[path]
+        _walk.side_effect = os_walk_side_effect
+
+        self.assertEqual(utils.is_mapped_luks_device('/dev/sdb'), True)
+
+    @patch.object(utils.os, 'walk')
+    @patch.object(utils, '_luks_uuid')
+    def test_luks_header_not_mapped(self, _luks_uuid, _walk):
+        _luks_uuid.return_value = 'db76d142-4782-42f2-84c6-914f9db889a0'
+
+        def os_walk_side_effect(path):
+            return {
+                '/sys/class/block/sdb/holders/': iter([('', [], [])]),
+            }[path]
+        _walk.side_effect = os_walk_side_effect
+
+        self.assertEqual(utils.is_mapped_luks_device('/dev/sdb'), False)
+
+    @patch.object(utils.os, 'walk')
+    @patch.object(utils, '_luks_uuid')
+    def test_no_luks_header_mapped(self, _luks_uuid, _walk):
+        """
+        This is an edge case where a device is mapped (i.e. used for something
+        else) but has no LUKS header. Should be handled by other checks.
+        """
+        _luks_uuid.return_value = None
+
+        def os_walk_side_effect(path):
+            return {
+                '/sys/class/block/sdb/holders/': iter([('', ['dm-0'], [])]),
+            }[path]
+        _walk.side_effect = os_walk_side_effect
+
+        self.assertEqual(utils.is_mapped_luks_device('/dev/sdb'), False)
 
 
 class CephAllocateVolumeTestCase(unittest.TestCase):
