@@ -460,15 +460,9 @@ class CephTestCase(unittest.TestCase):
         mock_reweight.assert_called_once_with(
             ['ceph', 'osd', 'crush', 'reweight', 'osd.0', '1'], stderr=-2)
 
-    @patch.object(utils, 'is_container')
-    def test_determine_packages(self, mock_is_container):
-        mock_is_container.return_value = False
-        self.assertTrue('ntp' in utils.determine_packages())
+    def test_determine_packages(self):
         self.assertEqual(utils.PACKAGES,
                          utils.determine_packages())
-
-        mock_is_container.return_value = True
-        self.assertFalse('ntp' in utils.determine_packages())
 
     @patch.object(utils, 'chownr')
     @patch.object(utils, 'cmp_pkgrevno')
