@@ -628,6 +628,7 @@ class CephTestCase(unittest.TestCase):
         _check_output.assert_called_with([
             'ceph-osd',
             '--show-config-value=bluestore_block_db_size',
+            '--no-mon-config',
         ])
 
     def test_partition_name(self):
