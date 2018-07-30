@@ -1287,6 +1287,7 @@ def add_keyring_to_ceph(keyring, secret, hostname, path, done, init_marker):
     subprocess.check_call(['ceph-mon', '--mkfs',
                            '-i', hostname,
                            '--keyring', keyring])
+    chownr('/var/log/ceph', ceph_user(), ceph_user())
     chownr(path, ceph_user(), ceph_user())
     with open(done, 'w'):
         pass
