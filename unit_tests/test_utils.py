@@ -259,6 +259,104 @@ class CephTestCase(unittest.TestCase):
         self.assertEqual(weight, 0.002899)
 
     @patch.object(utils.subprocess, 'check_output')
+    def test_get_osd_tree_multi_root(self, mock_check_output):
+        mock_check_output.return_value = b"""{
+    "nodes":[
+        {"id":-9,"name":"ssds","type":"root","type_id":10,"children":[-11,-12,-10]},
+        {"id":-10,"name":"OS-CS-10","type":"host","type_id":1,"children":[58,56,52]},
+        {"id":52,"name":"osd.52","type":"osd","type_id":0,"crush_weight":1.000000,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":56,"name":"osd.56","type":"osd","type_id":0,"crush_weight":1.000000,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":58,"name":"osd.58","type":"osd","type_id":0,"crush_weight":1.000000,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":-12,"name":"OS-CS-09","type":"host","type_id":1,"children":[59,55,53]},
+        {"id":53,"name":"osd.53","type":"osd","type_id":0,"crush_weight":1.000000,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":55,"name":"osd.55","type":"osd","type_id":0,"crush_weight":1.000000,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":59,"name":"osd.59","type":"osd","type_id":0,"crush_weight":1.000000,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":-11,"name":"OS-CS-08","type":"host","type_id":1,"children":[57,54,51]},
+        {"id":51,"name":"osd.51","type":"osd","type_id":0,"crush_weight":1.000000,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":54,"name":"osd.54","type":"osd","type_id":0,"crush_weight":1.000000,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":57,"name":"osd.57","type":"osd","type_id":0,"crush_weight":1.000000,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":-1,"name":"default","type":"root","type_id":10,"children":[-8,-7,-6,-5,-4,-3,-2]},
+        {"id":-2,"name":"OS-CS-05","type":"host","type_id":1,"children":[33,16,11,7,4,2,0]},
+        {"id":0,"name":"osd.0","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":2,"name":"osd.2","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":4,"name":"osd.4","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":7,"name":"osd.7","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":11,"name":"osd.11","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":16,"name":"osd.16","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":33,"name":"osd.33","type":"osd","type_id":0,"crush_weight":1.089996,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":-3,"name":"OS-CS-02","type":"host","type_id":1,"children":[35,20,15,10,6,3,1]},
+        {"id":1,"name":"osd.1","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":3,"name":"osd.3","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":6,"name":"osd.6","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":10,"name":"osd.10","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":15,"name":"osd.15","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":20,"name":"osd.20","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":35,"name":"osd.35","type":"osd","type_id":0,"crush_weight":1.089996,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":-4,"name":"OS-CS-03","type":"host","type_id":1,"children":[34,25,22,18,13,9,5]},
+        {"id":5,"name":"osd.5","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":9,"name":"osd.9","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":13,"name":"osd.13","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":18,"name":"osd.18","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":22,"name":"osd.22","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":25,"name":"osd.25","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":34,"name":"osd.34","type":"osd","type_id":0,"crush_weight":1.089996,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":-5,"name":"OS-CS-01","type":"host","type_id":1,"children":[31,27,24,21,17,12,8]},
+        {"id":8,"name":"osd.8","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":12,"name":"osd.12","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":17,"name":"osd.17","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":21,"name":"osd.21","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":24,"name":"osd.24","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":27,"name":"osd.27","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":31,"name":"osd.31","type":"osd","type_id":0,"crush_weight":1.089996,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":-6,"name":"OS-CS-04","type":"host","type_id":1,"children":[32,29,28,26,23,19,14]},
+        {"id":14,"name":"osd.14","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":19,"name":"osd.19","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":23,"name":"osd.23","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":26,"name":"osd.26","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":28,"name":"osd.28","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":29,"name":"osd.29","type":"osd","type_id":0,"crush_weight":0.543991,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":32,"name":"osd.32","type":"osd","type_id":0,"crush_weight":1.089996,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":-7,"name":"OS-CS-07","type":"host","type_id":1,"children":[42,41,40,39,38,37,36,30]},
+        {"id":30,"name":"osd.30","type":"osd","type_id":0,"crush_weight":1.089996,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":36,"name":"osd.36","type":"osd","type_id":0,"crush_weight":1.089996,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":37,"name":"osd.37","type":"osd","type_id":0,"crush_weight":1.089996,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":38,"name":"osd.38","type":"osd","type_id":0,"crush_weight":1.089996,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":39,"name":"osd.39","type":"osd","type_id":0,"crush_weight":1.089996,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":40,"name":"osd.40","type":"osd","type_id":0,"crush_weight":1.089996,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":41,"name":"osd.41","type":"osd","type_id":0,"crush_weight":1.089996,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":42,"name":"osd.42","type":"osd","type_id":0,"crush_weight":1.089996,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":-8,"name":"OS-CS-06","type":"host","type_id":1,"children":[50,49,48,47,46,45,44,43]},
+        {"id":43,"name":"osd.43","type":"osd","type_id":0,"crush_weight":1.089996,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":44,"name":"osd.44","type":"osd","type_id":0,"crush_weight":1.089996,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":45,"name":"osd.45","type":"osd","type_id":0,"crush_weight":1.089996,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":46,"name":"osd.46","type":"osd","type_id":0,"crush_weight":1.089996,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":47,"name":"osd.47","type":"osd","type_id":0,"crush_weight":1.089996,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":48,"name":"osd.48","type":"osd","type_id":0,"crush_weight":1.089996,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":49,"name":"osd.49","type":"osd","type_id":0,"crush_weight":1.089996,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":50,"name":"osd.50","type":"osd","type_id":0,"crush_weight":1.089996,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000}
+    ],"stray":[]}
+"""
+        osd_tree = utils.get_osd_tree('test')
+        self.assertEqual(osd_tree[0].name, "OS-CS-10")
+        self.assertEqual(osd_tree[-1].name, "OS-CS-06")
+
+    @patch.object(utils.subprocess, 'check_output')
+    def test_get_osd_tree_single_root(self, mock_check_output):
+        mock_check_output.return_value = b"""{
+    "nodes":[
+        {"id":-1,"name":"default","type":"root","type_id":10,"children":[-4,-3,-2]},
+        {"id":-2,"name":"juju-9d5cf0-icey-4","type":"host","type_id":1,"children":[0]},
+        {"id":0,"name":"osd.0","type":"osd","type_id":0,"crush_weight":0.000092,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":-3,"name":"juju-9d5cf0-icey-6","type":"host","type_id":1,"children":[1]},
+        {"id":1,"name":"osd.1","type":"osd","type_id":0,"crush_weight":0.000092,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":-4,"name":"juju-9d5cf0-icey-5","type":"host","type_id":1,"children":[2]},
+        {"id":2,"name":"osd.2","type":"osd","type_id":0,"crush_weight":0.000092,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000}],
+    "stray":[]}"""
+        osd_tree = utils.get_osd_tree('test')
+        self.assertEqual(osd_tree[0].name, "juju-9d5cf0-icey-4")
+        self.assertEqual(osd_tree[-1].name, "juju-9d5cf0-icey-5")
+
+    @patch.object(utils.subprocess, 'check_output')
     @patch.object(utils, "ceph_user", lambda: "ceph")
     @patch.object(utils.socket, "gethostname", lambda: "osd001")
     def test_get_named_key_with_pool(self, mock_check_output):

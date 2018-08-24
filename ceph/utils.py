@@ -579,7 +579,15 @@ def get_osd_tree(service):
             # Make sure children are present in the json
             if not json_tree['nodes']:
                 return None
-            child_ids = json_tree['nodes'][0]['children']
+            parent_nodes = [
+                node for node in json_tree['nodes'] if node['type'] == 'root']
+            child_ids = []
+            for node in parent_nodes:
+                try:
+                    child_ids = child_ids + node['children']
+                except KeyError:
+                    # skip if this parent has no children
+                    continue
             for child in json_tree['nodes']:
                 if child['id'] in child_ids:
                     crush_list.append(
