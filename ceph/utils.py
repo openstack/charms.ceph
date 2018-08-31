@@ -1525,7 +1525,8 @@ def _ceph_disk(dev, osd_format, osd_journal, encrypt=False, bluestore=False):
     """
     Prepare a device for usage as a Ceph OSD using ceph-disk
 
-    :param: dev: Full path to use for OSD block device setup
+    :param: dev: Full path to use for OSD block device setup,
+                 The function looks up realpath of the device
     :param: osd_journal: List of block devices to use for OSD journals
     :param: encrypt: Use block device encryption (unsupported)
     :param: bluestore: Use bluestore storage for OSD
@@ -1557,7 +1558,7 @@ def _ceph_disk(dev, osd_format, osd_journal, encrypt=False, bluestore=False):
     elif cmp_pkgrevno('ceph', '12.1.0') >= 0 and not bluestore:
         cmd.append('--filestore')
 
-    cmd.append(dev)
+    cmd.append(os.path.realpath(dev))
 
     if osd_journal:
         least_used = find_least_used_utility_device(osd_journal)
