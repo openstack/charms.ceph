@@ -2540,6 +2540,7 @@ UPGRADE_PATHS = collections.OrderedDict([
     ('firefly', 'hammer'),
     ('hammer', 'jewel'),
     ('jewel', 'luminous'),
+    ('luminous', 'mimic'),
 ])
 
 # Map UCA codenames to ceph codenames
@@ -2553,6 +2554,7 @@ UCA_CODENAME_MAP = {
     'ocata': 'jewel',
     'pike': 'luminous',
     'queens': 'luminous',
+    'rocky': 'mimic',
 }
 
 
