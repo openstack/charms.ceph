@@ -579,29 +579,23 @@ def get_osd_tree(service):
             # Make sure children are present in the json
             if not json_tree['nodes']:
                 return None
-            parent_nodes = [
-                node for node in json_tree['nodes'] if node['type'] == 'root']
-            child_ids = []
-            for node in parent_nodes:
-                try:
-                    child_ids = child_ids + node['children']
-                except KeyError:
-                    # skip if this parent has no children
-                    continue
-            for child in json_tree['nodes']:
-                if child['id'] in child_ids:
-                    crush_list.append(
-                        CrushLocation(
-                            name=child.get('name'),
-                            identifier=child['id'],
-                            host=child.get('host'),
-                            rack=child.get('rack'),
-                            row=child.get('row'),
-                            datacenter=child.get('datacenter'),
-                            chassis=child.get('chassis'),
-                            root=child.get('root')
-                        )
+            host_nodes = [
+                node for node in json_tree['nodes']
+                if node['type'] == 'host'
+            ]
+            for host in host_nodes:
+                crush_list.append(
+                    CrushLocation(
+                        name=host.get('name'),
+                        identifier=host['id'],
+                        host=host.get('host'),
+                        rack=host.get('rack'),
+                        row=host.get('row'),
+                        datacenter=host.get('datacenter'),
+                        chassis=host.get('chassis'),
+                        root=host.get('root')
                     )
+                )
             return crush_list
         except ValueError as v:
             log("Unable to parse ceph tree json: {}. Error: {}".format(

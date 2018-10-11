@@ -341,6 +341,47 @@ class CephTestCase(unittest.TestCase):
         self.assertEqual(osd_tree[-1].name, "OS-CS-06")
 
     @patch.object(utils.subprocess, 'check_output')
+    def test_get_osd_tree_multi_root_with_hierarchy(self, mock_check_output):
+        mock_check_output.return_value = b'''{
+    "nodes":[
+        {"id":-1,"name":"default","type":"root","type_id":10,"children":[-3,-2]},
+        {"id":-2,"name":"sata","type":"rack","type_id":3,"pool_weights":{},"children":[-5,-4]},
+        {"id":-4,"name":"uat-l-stor-11","type":"host","type_id":1,"pool_weights":{},"children":[5,4,3,2,1,0]},
+        {"id":0,"device_class":"hdd","name":"osd.0","type":"osd","type_id":0,"crush_weight":5.455994,"depth":3,"pool_weights":{},"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":1,"device_class":"hdd","name":"osd.1","type":"osd","type_id":0,"crush_weight":5.455994,"depth":3,"pool_weights":{},"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":2,"device_class":"hdd","name":"osd.2","type":"osd","type_id":0,"crush_weight":5.455994,"depth":3,"pool_weights":{},"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":3,"device_class":"hdd","name":"osd.3","type":"osd","type_id":0,"crush_weight":5.455994,"depth":3,"pool_weights":{},"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":4,"device_class":"hdd","name":"osd.4","type":"osd","type_id":0,"crush_weight":5.455994,"depth":3,"pool_weights":{},"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":5,"device_class":"hdd","name":"osd.5","type":"osd","type_id":0,"crush_weight":5.455994,"depth":3,"pool_weights":{},"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":-5,"name":"uat-l-stor-12","type":"host","type_id":1,"pool_weights":{},"children":[11,10,9,8,7,6]},
+        {"id":6,"device_class":"hdd","name":"osd.6","type":"osd","type_id":0,"crush_weight":5.455994,"depth":3,"pool_weights":{},"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":7,"device_class":"hdd","name":"osd.7","type":"osd","type_id":0,"crush_weight":5.455994,"depth":3,"pool_weights":{},"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":8,"device_class":"hdd","name":"osd.8","type":"osd","type_id":0,"crush_weight":5.455994,"depth":3,"pool_weights":{},"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":9,"device_class":"hdd","name":"osd.9","type":"osd","type_id":0,"crush_weight":5.455994,"depth":3,"pool_weights":{},"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":10,"device_class":"hdd","name":"osd.10","type":"osd","type_id":0,"crush_weight":5.455994,"depth":3,"pool_weights":{},"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":11,"device_class":"hdd","name":"osd.11","type":"osd","type_id":0,"crush_weight":5.455994,"depth":3,"pool_weights":{},"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":-3,"name":"ssd","type":"rack","type_id":3,"pool_weights":{},"children":[-7,-6]},
+        {"id":-6,"name":"uat-l-stor-13","type":"host","type_id":1,"pool_weights":{},"children":[17,16,15,14,13,12]},
+        {"id":12,"name":"osd.12","type":"osd","type_id":0,"crush_weight":1.429993,"depth":3,"pool_weights":{},"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":13,"name":"osd.13","type":"osd","type_id":0,"crush_weight":1.429993,"depth":3,"pool_weights":{},"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":14,"name":"osd.14","type":"osd","type_id":0,"crush_weight":1.429993,"depth":3,"pool_weights":{},"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":15,"name":"osd.15","type":"osd","type_id":0,"crush_weight":1.429993,"depth":3,"pool_weights":{},"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":16,"name":"osd.16","type":"osd","type_id":0,"crush_weight":1.429993,"depth":3,"pool_weights":{},"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":17,"name":"osd.17","type":"osd","type_id":0,"crush_weight":1.429993,"depth":3,"pool_weights":{},"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":-7,"name":"uat-l-stor-14","type":"host","type_id":1,"pool_weights":{},"children":[23,22,21,20,19,18]},
+        {"id":18,"name":"osd.18","type":"osd","type_id":0,"crush_weight":1.429993,"depth":3,"pool_weights":{},"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":19,"name":"osd.19","type":"osd","type_id":0,"crush_weight":1.429993,"depth":3,"pool_weights":{},"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":20,"name":"osd.20","type":"osd","type_id":0,"crush_weight":1.429993,"depth":3,"pool_weights":{},"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":21,"name":"osd.21","type":"osd","type_id":0,"crush_weight":1.429993,"depth":3,"pool_weights":{},"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":22,"name":"osd.22","type":"osd","type_id":0,"crush_weight":1.429993,"depth":3,"pool_weights":{},"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000},
+        {"id":23,"name":"osd.23","type":"osd","type_id":0,"crush_weight":1.429993,"depth":3,"pool_weights":{},"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000}],
+    "stray":[]}'''
+        osd_tree = utils.get_osd_tree('test')
+        self.assertTrue(len(osd_tree) == 4)
+        self.assertEqual(osd_tree[0].name, "uat-l-stor-11")
+        self.assertEqual(osd_tree[-1].name, "uat-l-stor-14")
+
+    @patch.object(utils.subprocess, 'check_output')
     def test_get_osd_tree_single_root(self, mock_check_output):
         mock_check_output.return_value = b"""{
     "nodes":[
