@@ -172,6 +172,7 @@ class CephTestCase(unittest.TestCase):
         db.get.assert_called_with('osd-devices', [])
         db.set.assert_not_called()
 
+    @patch.object(utils, 'kv')
     @patch.object(utils.subprocess, 'check_call')
     @patch.object(utils.os.path, 'exists')
     @patch.object(utils, 'is_device_mounted')
@@ -180,8 +181,11 @@ class CephTestCase(unittest.TestCase):
     @patch.object(utils, 'chownr')
     @patch.object(utils, 'ceph_user')
     def test_osdize_dir(self, _ceph_user, _chown, _mkdir,
-                        _cmp, _mounted, _exists, _call):
+                        _cmp, _mounted, _exists, _call, _kv):
         """Test that the dev osd is initialized correctly"""
+        db = MagicMock()
+        _kv.return_value = db
+        db.get.return_value = []
         _ceph_user.return_value = "ceph"
         _mounted.return_value = False
         _exists.return_value = False
@@ -190,6 +194,9 @@ class CephTestCase(unittest.TestCase):
                      bluestore=False)
         _call.assert_called_with(['sudo', '-u', 'ceph', 'ceph-disk', 'prepare',
                                   '--data-dir', '/srv/osd', '--filestore'])
+
+        db.get.assert_called_with('osd-devices', [])
+        db.set.assert_called_with('osd-devices', ['/srv/osd'])
 
     @patch.object(utils.subprocess, 'check_output')
     def test_get_osd_weight(self, output):
