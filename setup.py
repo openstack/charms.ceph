@@ -72,7 +72,7 @@ setup(
     ],
     url='https://github.com/openstack/charms.ceph',
     author='OpenStack Charmers',
-    author_email='openstack-dev@lists.openstack.org',
+    author_email='openstack-discuss@lists.openstack.org',
     license='Apache-2.0: http://www.apache.org/licenses/LICENSE-2.0',
     packages=find_packages(exclude=["unit_tests"]),
     zip_safe=False,
