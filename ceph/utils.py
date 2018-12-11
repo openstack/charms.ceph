@@ -1814,6 +1814,13 @@ def _initialize_disk(dev, dev_uuid, encrypt=False,
             '--uuid', dev_uuid,
             dev,
         ])
+        subprocess.check_call([
+            'dd',
+            'if=/dev/zero',
+            'of={}'.format(dm_crypt),
+            'bs=512',
+            'count=1',
+        ])
 
     if use_vaultlocker:
         return dm_crypt

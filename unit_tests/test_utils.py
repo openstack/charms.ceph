@@ -851,11 +851,14 @@ class CephInitializeDiskTestCase(unittest.TestCase):
                                                 True,
                                                 'vault'),
                          '/dev/mapper/crypt-test-UUID')
-        _check_call.assert_called_once_with(
-            ['vaultlocker', 'encrypt',
-             '--uuid', 'test-UUID',
-             '/dev/sdb']
-        )
+        _check_call.assert_has_calls([
+            call(['vaultlocker', 'encrypt',
+                  '--uuid', 'test-UUID',
+                  '/dev/sdb']),
+            call(['dd', 'if=/dev/zero',
+                  'of=/dev/mapper/crypt-test-UUID',
+                  'bs=512', 'count=1']),
+        ])
 
     @patch.object(utils, '_luks_uuid')
     @patch.object(utils.subprocess, 'check_call')
