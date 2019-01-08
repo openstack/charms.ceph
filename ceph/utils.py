@@ -1072,8 +1072,8 @@ _upgrade_caps = {
 }
 
 
-def get_radosgw_key(pool_list=None):
-    return get_named_key(name='radosgw.gateway',
+def get_radosgw_key(pool_list=None, name=None):
+    return get_named_key(name=name or 'radosgw.gateway',
                          caps=_radosgw_caps,
                          pool_list=pool_list)
 
