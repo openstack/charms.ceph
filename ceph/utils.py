@@ -935,6 +935,11 @@ def start_osds(devices):
                 subprocess.check_call(['ceph-disk', 'activate', dev_or_path])
 
 
+def udevadm_settle():
+    cmd = ['udevadm', 'settle']
+    subprocess.call(cmd)
+
+
 def rescan_osd_devices():
     cmd = [
         'udevadm', 'trigger',
@@ -943,8 +948,7 @@ def rescan_osd_devices():
 
     subprocess.call(cmd)
 
-    cmd = ['udevadm', 'settle']
-    subprocess.call(cmd)
+    udevadm_settle()
 
 
 _bootstrap_keyring = "/var/lib/ceph/bootstrap-osd/ceph.keyring"
