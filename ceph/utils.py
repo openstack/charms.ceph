@@ -2575,6 +2575,7 @@ UCA_CODENAME_MAP = {
     'pike': 'luminous',
     'queens': 'luminous',
     'rocky': 'mimic',
+    'stein': 'mimic',
 }
 
 
