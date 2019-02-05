@@ -140,7 +140,27 @@ class CephTestCase(unittest.TestCase):
         utils.osdize('/dev/sdb', osd_format='xfs', osd_journal=None,
                      bluestore=False)
         db.get.assert_called_with('osd-devices', [])
-        db.set.assert_not_called()
+        db.set.assert_called_with('osd-devices', ['/dev/sdb'])
+
+    @patch.object(utils, 'kv')
+    @patch.object(utils.os.path, 'exists')
+    @patch.object(utils, 'is_device_mounted')
+    @patch.object(utils, 'is_block_device')
+    @patch.object(utils, 'is_osd_disk')
+    def test_osdize_dev_already_processed_without_kv(self, _is_osd, _is_blk,
+                                                     _mounted, _exists, _kv):
+        """Ensure that previously processed disks are skipped"""
+        db = MagicMock()
+        _kv.return_value = db
+        db.get.return_value = []
+        _exists.return_value = True
+        _is_osd.return_value = True
+        _mounted.return_value = True
+        _is_blk.return_value = True
+        utils.osdize('/dev/sdb', osd_format='xfs', osd_journal=None,
+                     bluestore=False)
+        db.get.assert_called_with('osd-devices', [])
+        db.set.assert_called_with('osd-devices', ['/dev/sdb'])
 
     @patch.object(utils, 'kv')
     @patch.object(utils.subprocess, 'check_call')
@@ -170,7 +190,7 @@ class CephTestCase(unittest.TestCase):
         utils.osdize('/dev/sdb', encrypt=True, osd_format=None,
                      osd_journal=None, bluestore=True, key_manager='vault')
         db.get.assert_called_with('osd-devices', [])
-        db.set.assert_not_called()
+        db.set.assert_called_with('osd-devices', [])
 
     @patch.object(utils, 'kv')
     @patch.object(utils.subprocess, 'check_call')
