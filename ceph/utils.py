@@ -1132,6 +1132,15 @@ osd_upgrade_caps = collections.OrderedDict([
              ])
 ])
 
+rbd_mirror_caps = collections.OrderedDict([
+    ('mon', ['profile rbd']),
+    ('osd', ['profile rbd']),
+])
+
+
+def get_rbd_mirror_key(name):
+    return get_named_key(name=name, caps=rbd_mirror_caps)
+
 
 def create_named_keyring(entity, name, caps=None):
     caps = caps or _default_caps

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import collections
 import unittest
 
 from mock import (
@@ -803,6 +804,17 @@ class CephTestCase(unittest.TestCase):
                          '/dev/sdb1')
         self.assertEqual(utils._partition_name('/dev/mmcblk0'),
                          '/dev/mmcblk0p1')
+
+    @patch.object(utils, 'get_named_key')
+    def test_get_rbd_mirror_key(self, _get_named_key):
+        utils.get_rbd_mirror_key('someid')
+        _get_named_key.assert_called_once_with(
+            name='someid',
+            caps=collections.OrderedDict([
+                ('mon', ['profile rbd']),
+                ('osd', ['profile rbd']),
+            ])
+        )
 
 
 class CephVolumeSizeCalculatorTestCase(unittest.TestCase):
