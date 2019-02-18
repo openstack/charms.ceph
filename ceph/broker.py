@@ -85,6 +85,7 @@ POOL_KEYS = {
     "compression_mode": [str, ["none", "passive", "aggressive", "force"]],
     "compression_algorithm": [str, ["lz4", "snappy", "zlib", "zstd"]],
     "compression_required_ratio": [float, [0.0, 1.0]],
+    "crush_rule": [str],
 }
 
 CEPH_BUCKET_TYPES = [
