@@ -816,6 +816,102 @@ class CephTestCase(unittest.TestCase):
             ])
         )
 
+    @patch.object(utils.subprocess, 'check_output')
+    def test_list_pools(self, _check_output):
+        _check_output.return_value = 'poola\npoolb\n'
+        self.assertEqual(utils.list_pools('someuser'), ['poola', 'poolb'])
+        _check_output.assert_called_with(['rados', '--id', 'someuser',
+                                          'lspools'], universal_newlines=True)
+        self.assertEqual(utils.list_pools(client='someotheruser'),
+                         ['poola', 'poolb'])
+        _check_output.assert_called_with(['rados', '--id', 'someotheruser',
+                                          'lspools'], universal_newlines=True)
+        self.assertEqual(utils.list_pools(),
+                         ['poola', 'poolb'])
+        _check_output.assert_called_with(['rados', '--id', 'admin',
+                                          'lspools'], universal_newlines=True)
+
+    @patch.object(utils.subprocess, 'check_output')
+    def test_get_pool_param(self, _check_output):
+        _check_output.return_value = 'size: 3\n'
+        self.assertEqual(utils.get_pool_param('rbd', 'size'), '3')
+        _check_output.assert_called_with(['ceph', '--id', 'admin', 'osd',
+                                          'pool', 'get', 'rbd', 'size'],
+                                         universal_newlines=True)
+
+    @patch.object(utils.subprocess, 'check_output')
+    def test_get_pool_quota(self, _check_output):
+        _check_output.return_value = (
+            "quotas for pool 'rbd':\n"
+            "  max objects: N/A\n"
+            "  max bytes  : N/A\n")
+        self.assertEqual(utils.get_pool_quota('rbd'),
+                         {})
+        _check_output.assert_called_with(['ceph', '--id', 'admin', 'osd',
+                                          'pool', 'get-quota', 'rbd'],
+                                         universal_newlines=True)
+        _check_output.return_value = (
+            "quotas for pool 'rbd':\n"
+            "  max objects: 10\n"
+            "  max bytes  : N/A\n")
+        self.assertEqual(utils.get_pool_quota('rbd'), {'max_objects': '10'})
+        _check_output.return_value = (
+            "quotas for pool 'rbd':\n"
+            "  max objects: N/A\n"
+            "  max bytes  : 1000B\n")
+        self.assertEqual(utils.get_pool_quota('rbd'), {'max_bytes': '1000'})
+        _check_output.return_value = (
+            "quotas for pool 'rbd':\n"
+            "  max objects: 10\n"
+            "  max bytes  : 1000B\n")
+        self.assertEqual(utils.get_pool_quota('rbd'),
+                         {'max_objects': '10', 'max_bytes': '1000'})
+
+    @patch.object(utils.subprocess, 'check_output')
+    def test_get_pool_applications(self, _check_output):
+        _check_output.return_value = (
+            '{\n'
+            '    "pool": {\n'
+            '        "application": {}\n'
+            '    }\n'
+            '}\n')
+        self.assertEqual(utils.get_pool_applications(),
+                         {'pool': {'application': {}}})
+        _check_output.assert_called_with(['ceph', '--id', 'admin', 'osd',
+                                          'pool', 'application', 'get'],
+                                         universal_newlines=True)
+        utils.get_pool_applications('42')
+        _check_output.assert_called_with(['ceph', '--id', 'admin', 'osd',
+                                          'pool', 'application', 'get', '42'],
+                                         universal_newlines=True)
+
+    @patch.object(utils, 'get_pool_param')
+    @patch.object(utils, 'get_pool_quota')
+    @patch.object(utils, 'list_pools')
+    @patch.object(utils, 'get_pool_applications')
+    def test_list_pools_detail(self, _get_pool_applications, _list_pools,
+                               _get_pool_quota, _get_pool_param):
+        self.assertEqual(utils.list_pools_detail(), {})
+        _get_pool_applications.return_value = {'pool': {'application': {}}}
+        _list_pools.return_value = ['pool', 'pool2']
+        _get_pool_quota.return_value = {'max_objects': '10',
+                                        'max_bytes': '1000'}
+        _get_pool_param.return_value = '42'
+        self.assertEqual(utils.list_pools_detail(),
+                         {'pool': {'applications': {'application': {}},
+                                   'parameters': {'pg_num': '42',
+                                                  'size': '42'},
+                                   'quota': {'max_bytes': '1000',
+                                             'max_objects': '10'},
+                                   },
+                          'pool2': {'applications': {},
+                                    'parameters': {'pg_num': '42',
+                                                   'size': '42'},
+                                    'quota': {'max_bytes': '1000',
+                                              'max_objects': '10'},
+                                    },
+                          })
+
 
 class CephVolumeSizeCalculatorTestCase(unittest.TestCase):
 
