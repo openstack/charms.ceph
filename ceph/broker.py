@@ -369,7 +369,8 @@ def handle_erasure_pool(request, service):
     """
     pool_name = request.get('name')
     erasure_profile = request.get('erasure-profile')
-    quota = request.get('max-bytes')
+    max_bytes = request.get('max-bytes')
+    max_objects = request.get('max-objects')
     weight = request.get('weight')
     group_name = request.get('group')
 
@@ -409,8 +410,9 @@ def handle_erasure_pool(request, service):
         pool.create()
 
     # Set a quota if requested
-    if quota is not None:
-        set_pool_quota(service=service, pool_name=pool_name, max_bytes=quota)
+    if max_bytes or max_objects:
+        set_pool_quota(service=service, pool_name=pool_name,
+                       max_bytes=max_bytes, max_objects=max_objects)
 
 
 def handle_replicated_pool(request, service):
@@ -422,7 +424,8 @@ def handle_replicated_pool(request, service):
     """
     pool_name = request.get('name')
     replicas = request.get('replicas')
-    quota = request.get('max-bytes')
+    max_bytes = request.get('max-bytes')
+    max_objects = request.get('max-objects')
     weight = request.get('weight')
     group_name = request.get('group')
 
@@ -469,8 +472,9 @@ def handle_replicated_pool(request, service):
             level=DEBUG)
 
     # Set a quota if requested
-    if quota is not None:
-        set_pool_quota(service=service, pool_name=pool_name, max_bytes=quota)
+    if max_bytes or max_objects:
+        set_pool_quota(service=service, pool_name=pool_name,
+                       max_bytes=max_bytes, max_objects=max_objects)
 
 
 def handle_create_cache_tier(request, service):

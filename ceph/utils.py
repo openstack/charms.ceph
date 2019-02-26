@@ -2533,7 +2533,8 @@ def list_pools(client='admin'):
     try:
         pool_list = []
         pools = subprocess.check_output(['rados', '--id', client, 'lspools'],
-                                        universal_newlines=True)
+                                        universal_newlines=True,
+                                        stderr=subprocess.STDOUT)
         for pool in pools.splitlines():
             pool_list.append(pool)
         return pool_list
@@ -2558,14 +2559,35 @@ def get_pool_param(pool, param, client='admin'):
     """
     try:
         output = subprocess.check_output(
-            ['ceph', '--id', client, 'osd', 'pool', 'get',
-             pool, param], universal_newlines=True)
+            ['ceph', '--id', client, 'osd', 'pool', 'get', pool, param],
+            universal_newlines=True, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as cp:
         if cp.returncode == 2 and 'ENOENT: option' in cp.output:
             return None
         raise
     if ':' in output:
         return output.split(':')[1].lstrip().rstrip()
+
+
+def get_pool_erasure_profile(pool, client='admin'):
+    """Get erasure code profile for pool.
+
+    :param pool: Name of pool to get variable from
+    :type pool: str
+    :param client: (Optional) client id for ceph key to use
+                   Defaults to ``admin``
+    :type cilent: str
+    :returns: Erasure code profile of pool or None
+    :rtype: str or None
+    :raises: subprocess.CalledProcessError
+    """
+    try:
+        return get_pool_param(pool, 'erasure_code_profile', client=client)
+    except subprocess.CalledProcessError as cp:
+        if cp.returncode == 13 and 'EACCES: pool' in cp.output:
+            # Not a Erasure coded pool
+            return None
+        raise
 
 
 def get_pool_quota(pool, client='admin'):
@@ -2582,7 +2604,7 @@ def get_pool_quota(pool, client='admin'):
     """
     output = subprocess.check_output(
         ['ceph', '--id', client, 'osd', 'pool', 'get-quota', pool],
-        universal_newlines=True)
+        universal_newlines=True, stderr=subprocess.STDOUT)
     rc = re.compile(r'\s+max\s+(\S+)\s*:\s+(\d+)')
     result = {}
     for line in output.splitlines():
@@ -2610,7 +2632,9 @@ def get_pool_applications(pool='', client='admin'):
     if pool:
         cmd.append(pool)
     try:
-        output = subprocess.check_output(cmd, universal_newlines=True)
+        output = subprocess.check_output(cmd,
+                                         universal_newlines=True,
+                                         stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as cp:
         if cp.returncode == 2 and 'ENOENT' in cp.output:
             return {}
@@ -2646,6 +2670,10 @@ def list_pools_detail():
         for param in get_params:
             result[pool]['parameters'].update({
                 param: get_pool_param(pool, param)})
+        erasure_profile = get_pool_erasure_profile(pool)
+        if erasure_profile:
+            result[pool]['parameters'].update({
+                'erasure_code_profile': erasure_profile})
     return result
 
 

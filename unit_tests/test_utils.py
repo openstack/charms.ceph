@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import collections
+import subprocess
 import unittest
 
 from mock import (
@@ -821,15 +822,18 @@ class CephTestCase(unittest.TestCase):
         _check_output.return_value = 'poola\npoolb\n'
         self.assertEqual(utils.list_pools('someuser'), ['poola', 'poolb'])
         _check_output.assert_called_with(['rados', '--id', 'someuser',
-                                          'lspools'], universal_newlines=True)
+                                          'lspools'], universal_newlines=True,
+                                         stderr=subprocess.STDOUT)
         self.assertEqual(utils.list_pools(client='someotheruser'),
                          ['poola', 'poolb'])
         _check_output.assert_called_with(['rados', '--id', 'someotheruser',
-                                          'lspools'], universal_newlines=True)
+                                          'lspools'], universal_newlines=True,
+                                         stderr=subprocess.STDOUT)
         self.assertEqual(utils.list_pools(),
                          ['poola', 'poolb'])
         _check_output.assert_called_with(['rados', '--id', 'admin',
-                                          'lspools'], universal_newlines=True)
+                                          'lspools'], universal_newlines=True,
+                                         stderr=subprocess.STDOUT)
 
     @patch.object(utils.subprocess, 'check_output')
     def test_get_pool_param(self, _check_output):
@@ -837,7 +841,22 @@ class CephTestCase(unittest.TestCase):
         self.assertEqual(utils.get_pool_param('rbd', 'size'), '3')
         _check_output.assert_called_with(['ceph', '--id', 'admin', 'osd',
                                           'pool', 'get', 'rbd', 'size'],
-                                         universal_newlines=True)
+                                         universal_newlines=True,
+                                         stderr=subprocess.STDOUT)
+
+    @patch.object(utils, 'get_pool_param')
+    def test_get_pool_erasure_profile(self, _get_pool_param):
+        _get_pool_param.side_effect = subprocess.CalledProcessError(
+            13, [], 'EACCES: pool')
+        self.assertEqual(utils.get_pool_erasure_profile('cinder-ceph'), None)
+        _get_pool_param.side_effect = subprocess.CalledProcessError(
+            22, [], 'EINVAL: invalid')
+        with self.assertRaises(subprocess.CalledProcessError):
+            utils.get_pool_erasure_profile('cinder-ceph')
+        _get_pool_param.side_effect = None
+        _get_pool_param.return_value = 'my-ec-profile'
+        self.assertEqual(utils.get_pool_erasure_profile('cinder-ceph'),
+                         'my-ec-profile')
 
     @patch.object(utils.subprocess, 'check_output')
     def test_get_pool_quota(self, _check_output):
@@ -849,7 +868,8 @@ class CephTestCase(unittest.TestCase):
                          {})
         _check_output.assert_called_with(['ceph', '--id', 'admin', 'osd',
                                           'pool', 'get-quota', 'rbd'],
-                                         universal_newlines=True)
+                                         universal_newlines=True,
+                                         stderr=subprocess.STDOUT)
         _check_output.return_value = (
             "quotas for pool 'rbd':\n"
             "  max objects: 10\n"
@@ -879,38 +899,46 @@ class CephTestCase(unittest.TestCase):
                          {'pool': {'application': {}}})
         _check_output.assert_called_with(['ceph', '--id', 'admin', 'osd',
                                           'pool', 'application', 'get'],
-                                         universal_newlines=True)
+                                         universal_newlines=True,
+                                         stderr=subprocess.STDOUT)
         utils.get_pool_applications('42')
         _check_output.assert_called_with(['ceph', '--id', 'admin', 'osd',
                                           'pool', 'application', 'get', '42'],
-                                         universal_newlines=True)
+                                         universal_newlines=True,
+                                         stderr=subprocess.STDOUT)
 
+    @patch.object(utils, 'get_pool_erasure_profile')
     @patch.object(utils, 'get_pool_param')
     @patch.object(utils, 'get_pool_quota')
     @patch.object(utils, 'list_pools')
     @patch.object(utils, 'get_pool_applications')
     def test_list_pools_detail(self, _get_pool_applications, _list_pools,
-                               _get_pool_quota, _get_pool_param):
+                               _get_pool_quota, _get_pool_param,
+                               _get_pool_erasure_profile):
         self.assertEqual(utils.list_pools_detail(), {})
         _get_pool_applications.return_value = {'pool': {'application': {}}}
         _list_pools.return_value = ['pool', 'pool2']
         _get_pool_quota.return_value = {'max_objects': '10',
                                         'max_bytes': '1000'}
         _get_pool_param.return_value = '42'
-        self.assertEqual(utils.list_pools_detail(),
-                         {'pool': {'applications': {'application': {}},
-                                   'parameters': {'pg_num': '42',
-                                                  'size': '42'},
-                                   'quota': {'max_bytes': '1000',
-                                             'max_objects': '10'},
-                                   },
-                          'pool2': {'applications': {},
-                                    'parameters': {'pg_num': '42',
-                                                   'size': '42'},
-                                    'quota': {'max_bytes': '1000',
-                                              'max_objects': '10'},
-                                    },
-                          })
+        _get_pool_erasure_profile.return_value = 'my-ec-profile'
+        self.assertEqual(
+            utils.list_pools_detail(),
+            {'pool': {'applications': {'application': {}},
+                      'parameters': {'pg_num': '42',
+                                     'size': '42',
+                                     'erasure_code_profile': 'my-ec-profile'},
+                      'quota': {'max_bytes': '1000',
+                                'max_objects': '10'},
+                      },
+             'pool2': {'applications': {},
+                       'parameters': {'pg_num': '42',
+                                      'size': '42',
+                                      'erasure_code_profile': 'my-ec-profile'},
+                       'quota': {'max_bytes': '1000',
+                                 'max_objects': '10'},
+                       },
+             })
 
 
 class CephVolumeSizeCalculatorTestCase(unittest.TestCase):
