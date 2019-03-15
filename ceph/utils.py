@@ -1555,7 +1555,7 @@ def _ceph_disk(dev, osd_format, osd_journal, encrypt=False, bluestore=False):
         cmd.append(osd_format)
 
     # NOTE(jamespage): enable experimental bluestore support
-    if cmp_pkgrevno('ceph', '10.2.0') >= 0 and bluestore:
+    if cmp_pkgrevno('ceph', '12.2.0') >= 0 and bluestore:
         cmd.append('--bluestore')
         wal = get_devices('bluestore-wal')
         if wal:
@@ -1567,7 +1567,7 @@ def _ceph_disk(dev, osd_format, osd_journal, encrypt=False, bluestore=False):
             cmd.append('--block.db')
             least_used_db = find_least_used_utility_device(db)
             cmd.append(least_used_db)
-    elif cmp_pkgrevno('ceph', '12.1.0') >= 0 and not bluestore:
+    elif cmp_pkgrevno('ceph', '12.2.0') >= 0 and not bluestore:
         cmd.append('--filestore')
 
     cmd.append(os.path.realpath(dev))
