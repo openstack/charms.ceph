@@ -2710,6 +2710,14 @@ def dirs_need_ownership_update(service):
         if (curr_owner == expected_owner) and (curr_group == expected_group):
             continue
 
+        # NOTE(lathiat): when config_changed runs on reboot, the OSD might not
+        # yet be mounted or started, and the underlying directory the OSD is
+        # mounted to is expected to be owned by root. So skip the check. This
+        # may also happen for OSD directories for OSDs that were removed.
+        if (service == 'osd' and
+                not os.path.exists(os.path.join(child, 'magic'))):
+            continue
+
         log('Directory "%s" needs its ownership updated' % child, DEBUG)
         return True
 
