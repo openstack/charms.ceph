@@ -1702,7 +1702,10 @@ def is_active_bluestore_device(dev):
         return False
 
     vg_name = lvm.list_lvm_volume_group(dev)
-    lv_name = lvm.list_logical_volumes('vg_name={}'.format(vg_name))[0]
+    try:
+        lv_name = lvm.list_logical_volumes('vg_name={}'.format(vg_name))[0]
+    except IndexError:
+        return False
 
     block_symlinks = glob.glob('/var/lib/ceph/osd/ceph-*/block')
     for block_candidate in block_symlinks:
