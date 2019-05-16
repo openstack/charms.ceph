@@ -1242,15 +1242,17 @@ class CephAllocateVolumeTestCase(unittest.TestCase):
 
 class CephDiskTestCase(unittest.TestCase):
 
+    @patch.object(utils, 'use_bluestore')
     @patch.object(utils, 'cmp_pkgrevno')
     @patch.object(utils, 'find_least_used_utility_device')
     @patch.object(utils, 'get_devices')
     def test_ceph_disk_filestore(self, _get_devices,
                                  _find_least_used_utility_device,
-                                 _cmp_pkgrevno):
+                                 _cmp_pkgrevno, _use_bluestore):
         # >= Jewel < Luminous RC
-        _cmp_pkgrevno.side_effect = [1, -1]
+        _cmp_pkgrevno.side_effect = [-1]
         _get_devices.return_value = []
+        _use_bluestore.return_value = False
         self.assertEqual(
             utils._ceph_disk('/dev/sdb',
                              osd_format='xfs',
@@ -1262,15 +1264,17 @@ class CephDiskTestCase(unittest.TestCase):
              '/dev/sdb']
         )
 
+    @patch.object(utils, 'use_bluestore')
     @patch.object(utils, 'cmp_pkgrevno')
     @patch.object(utils, 'find_least_used_utility_device')
     @patch.object(utils, 'get_devices')
     def test_ceph_disk_filestore_luminous(self, _get_devices,
                                           _find_least_used_utility_device,
-                                          _cmp_pkgrevno):
+                                          _cmp_pkgrevno, _use_bluestore):
         # >= Jewel
         _cmp_pkgrevno.return_value = 1
         _get_devices.return_value = []
+        _use_bluestore.return_value = False
         self.assertEqual(
             utils._ceph_disk('/dev/sdb',
                              osd_format='xfs',
@@ -1282,17 +1286,19 @@ class CephDiskTestCase(unittest.TestCase):
              '--filestore', '/dev/sdb']
         )
 
+    @patch.object(utils, 'use_bluestore')
     @patch.object(utils, 'cmp_pkgrevno')
     @patch.object(utils, 'find_least_used_utility_device')
     @patch.object(utils, 'get_devices')
     def test_ceph_disk_filestore_journal(self, _get_devices,
                                          _find_least_used_utility_device,
-                                         _cmp_pkgrevno):
+                                         _cmp_pkgrevno, _use_bluestore):
         # >= Jewel
         _cmp_pkgrevno.return_value = 1
         _get_devices.return_value = []
         _find_least_used_utility_device.side_effect = \
             lambda x, lvs=False: x[0]
+        _use_bluestore.return_value = False
         self.assertEqual(
             utils._ceph_disk('/dev/sdb',
                              osd_format='xfs',
@@ -1305,17 +1311,19 @@ class CephDiskTestCase(unittest.TestCase):
              '/dev/sdc']
         )
 
+    @patch.object(utils, 'use_bluestore')
     @patch.object(utils, 'cmp_pkgrevno')
     @patch.object(utils, 'find_least_used_utility_device')
     @patch.object(utils, 'get_devices')
     def test_ceph_disk_bluestore(self, _get_devices,
                                  _find_least_used_utility_device,
-                                 _cmp_pkgrevno):
+                                 _cmp_pkgrevno, _use_bluestore):
         # >= Jewel
         _cmp_pkgrevno.return_value = 1
         _get_devices.return_value = []
         _find_least_used_utility_device.side_effect = \
             lambda x, lvs=False: x[0]
+        _use_bluestore.return_value = True
         self.assertEqual(
             utils._ceph_disk('/dev/sdb',
                              osd_format='xfs',
@@ -1326,12 +1334,13 @@ class CephDiskTestCase(unittest.TestCase):
              '--bluestore', '/dev/sdb']
         )
 
+    @patch.object(utils, 'use_bluestore')
     @patch.object(utils, 'cmp_pkgrevno')
     @patch.object(utils, 'find_least_used_utility_device')
     @patch.object(utils, 'get_devices')
     def test_ceph_disk_bluestore_dbwal(self, _get_devices,
                                        _find_least_used_utility_device,
-                                       _cmp_pkgrevno):
+                                       _cmp_pkgrevno, _use_bluestore):
         # >= Jewel
         _cmp_pkgrevno.return_value = 1
         _bluestore_devs = {
@@ -1341,6 +1350,7 @@ class CephDiskTestCase(unittest.TestCase):
         _get_devices.side_effect = lambda x: _bluestore_devs.get(x, [])
         _find_least_used_utility_device.side_effect = \
             lambda x, lvs=False: x[0]
+        _use_bluestore.return_value = True
         self.assertEqual(
             utils._ceph_disk('/dev/sdb',
                              osd_format='xfs',
@@ -1634,6 +1644,37 @@ class CephFindLeastUsedDeviceTestCase(unittest.TestCase):
             '/dev/sdb'
         )
         _get_lvs.assert_called()
+
+
+class CephUseBluestoreTestCase(unittest.TestCase):
+
+    @patch.object(utils, 'cmp_pkgrevno')
+    def test_use_bluerstore_old_ceph_enabled_config(self, _cmp_pkgrevno):
+        _cmp_pkgrevno.return_value = -1
+        self.assertFalse(utils.use_bluestore())
+
+    @patch.object(utils, 'cmp_pkgrevno')
+    def test_use_bluerstore_old_ceph_disabled_config(self, _cmp_pkgrevno):
+        _cmp_pkgrevno.return_value = -1
+        self.assertFalse(utils.use_bluestore())
+
+    @patch.object(utils, 'cmp_pkgrevno')
+    @patch.object(utils, 'config')
+    def test_use_bluerstore_new_ceph_enabled_config(self,
+                                                    _config,
+                                                    _cmp_pkgrevno):
+        _cmp_pkgrevno.return_value = 1
+        _config.return_value = True
+        assert(utils.use_bluestore())
+
+    @patch.object(utils, 'cmp_pkgrevno')
+    @patch.object(utils, 'config')
+    def test_use_bluerstore_new_ceph_disabled_config(self,
+                                                     _config,
+                                                     _cmp_pkgrevno):
+        _cmp_pkgrevno.return_value = 1
+        _config.return_value = False
+        self.assertFalse(utils.use_bluestore())
 
 
 class CephGetLVSTestCase(unittest.TestCase):
