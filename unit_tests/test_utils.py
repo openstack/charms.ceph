@@ -632,29 +632,20 @@ class CephTestCase(unittest.TestCase):
         self.assertEqual(utils.PACKAGES,
                          utils.determine_packages())
 
-    @patch.object(utils, 'chownr')
-    @patch.object(utils, 'cmp_pkgrevno')
+    @patch.object(utils, '_create_monitor')
+    @patch.object(utils, '_create_keyrings')
     @patch.object(utils, 'ceph_user')
     @patch.object(utils, 'os')
     @patch.object(utils, 'systemd')
-    @patch.object(utils, 'log')
     @patch.object(utils, 'mkdir')
-    @patch.object(utils.subprocess, 'check_output')
-    @patch.object(utils.subprocess, 'check_call')
-    @patch.object(utils, 'service_restart')
     @patch.object(utils.socket, 'gethostname', lambda: 'TestHost')
-    def _test_bootstrap_monitor_cluster(self,
-                                        mock_service_restart,
-                                        mock_check_call,
-                                        mock_check_output,
-                                        mock_mkdir,
-                                        mock_log,
-                                        mock_systemd,
-                                        mock_os,
-                                        mock_ceph_user,
-                                        mock_cmp_pkgrevno,
-                                        mock_chownr,
-                                        luminous=False):
+    def test_bootstrap_monitor_cluster(self,
+                                       mock_mkdir,
+                                       mock_systemd,
+                                       mock_os,
+                                       mock_ceph_user,
+                                       mock_create_keyrings,
+                                       mock_create_monitor):
         test_hostname = utils.socket.gethostname()
         test_secret = 'mysecret'
         test_keyring = '/var/lib/ceph/tmp/{}.mon.keyring'.format(test_hostname)
@@ -664,8 +655,56 @@ class CephTestCase(unittest.TestCase):
 
         mock_os.path.exists.return_value = False
         mock_systemd.return_value = True
-        mock_cmp_pkgrevno.return_value = 1 if luminous else -1
         mock_ceph_user.return_value = 'ceph'
+
+        utils.bootstrap_monitor_cluster(test_secret)
+
+        mock_mkdir.assert_has_calls([
+            call('/var/run/ceph', owner='ceph',
+                 group='ceph', perms=0o755),
+            call(test_path, owner='ceph', group='ceph',
+                 perms=0o755),
+        ])
+        mock_create_monitor.assert_called_once_with(
+            test_keyring,
+            test_secret,
+            test_hostname,
+            test_path,
+            test_done,
+            test_init_marker,
+        )
+        mock_create_keyrings.assert_called_once_with()
+        mock_os.unlink.assert_called_with(test_keyring)
+
+    @patch.object(utils, 'systemd')
+    @patch.object(utils, 'chownr')
+    @patch.object(utils, 'cmp_pkgrevno')
+    @patch.object(utils, 'ceph_user')
+    @patch.object(utils.subprocess, 'check_call')
+    @patch.object(utils, 'service_restart')
+    @patch.object(utils.socket, 'gethostname', lambda: 'TestHost')
+    def _test_create_monitor(self,
+                             mock_service_restart,
+                             mock_check_call,
+                             mock_ceph_user,
+                             mock_cmp_pkgrevno,
+                             mock_chownr,
+                             mock_systemd,
+                             nautilus=False):
+        test_hostname = utils.socket.gethostname()
+        test_secret = 'mysecret'
+        test_keyring = '/var/lib/ceph/tmp/{}.mon.keyring'.format(test_hostname)
+        test_path = '/var/lib/ceph/mon/ceph-{}'.format(test_hostname)
+        test_done = '{}/done'.format(test_path)
+        test_init_marker = '{}/systemd'.format(test_path)
+
+        mock_systemd.return_value = True
+        mock_cmp_pkgrevno.return_value = 1 if nautilus else -1
+        mock_ceph_user.return_value = 'ceph'
+
+        test_systemd_unit = (
+            'ceph-mon@{}'.format(test_hostname) if nautilus else 'ceph-mon'
+        )
 
         test_calls = [
             call(
@@ -679,36 +718,103 @@ class CephTestCase(unittest.TestCase):
                  '-i', test_hostname,
                  '--keyring', test_keyring]
             ),
-            call(['systemctl', 'enable', 'ceph-mon']),
+            call(['systemctl', 'enable', test_systemd_unit])
         ]
-        if luminous:
-            test_calls.append(
-                call(['ceph-create-keys', '--id', test_hostname, '--timeout',
-                      '1800'])
-            )
 
         fake_open = mock_open()
         with patch('ceph.utils.open', fake_open, create=True):
-            utils.bootstrap_monitor_cluster(test_secret)
+            utils._create_monitor(
+                test_keyring,
+                test_secret,
+                test_hostname,
+                test_path,
+                test_done,
+                test_init_marker
+            )
 
         mock_check_call.assert_has_calls(test_calls)
-        mock_service_restart.assert_called_with('ceph-mon')
-        mock_mkdir.assert_has_calls([
-            call('/var/run/ceph', owner='ceph',
-                 group='ceph', perms=0o755),
-            call(test_path, owner='ceph', group='ceph',
-                 perms=0o755),
-        ])
-        fake_open.assert_has_calls([call(test_done, 'w'),
-                                    call(test_init_marker, 'w')],
-                                   any_order=True)
-        mock_os.unlink.assert_called_with(test_keyring)
+        mock_service_restart.assert_called_with(test_systemd_unit)
 
-    def test_bootstrap_monitor_cluster(self):
-        self._test_bootstrap_monitor_cluster(luminous=False)
+    def test_create_monitor(self):
+        self._test_create_monitor(nautilus=False)
 
-    def test_bootstrap_monitor_cluster_luminous(self):
-        self._test_bootstrap_monitor_cluster(luminous=True)
+    def test_create_monitor_nautilus(self):
+        self._test_create_monitor(nautilus=True)
+
+    @patch.object(utils, 'write_file')
+    @patch.object(utils, 'cmp_pkgrevno')
+    @patch.object(utils, 'ceph_user')
+    @patch.object(utils, 'os')
+    @patch.object(utils.subprocess, 'check_output')
+    @patch.object(utils.subprocess, 'check_call')
+    @patch.object(utils.socket, 'gethostname', lambda: 'TestHost')
+    def _test_create_keyrings(self,
+                              mock_check_call,
+                              mock_check_output,
+                              mock_os,
+                              mock_ceph_user,
+                              mock_cmp_pkgrevno,
+                              mock_write_file,
+                              ceph_version='10.0.0'):
+        def _cmp_pkgrevno(_, version):
+            # NOTE: this is fairly brittle as it just
+            #       does direct string comparison for
+            #       version checking
+            if ceph_version == version:
+                return 1
+            else:
+                return -1
+        test_hostname = utils.socket.gethostname()
+
+        mock_os.path.exists.return_value = False
+        mock_cmp_pkgrevno.side_effect = _cmp_pkgrevno
+        mock_ceph_user.return_value = 'ceph'
+        mock_check_output.return_value = b'testkey'
+
+        test_calls = []
+        if ceph_version == '12.0.0':
+            test_calls.append(
+                call(['ceph-create-keys', '--id', test_hostname,
+                      '--timeout', '1800'])
+            )
+        elif ceph_version == '10.0.0':
+            test_calls.append(
+                call(['ceph-create-keys', '--id', test_hostname])
+            )
+
+        utils._create_keyrings()
+
+        mock_check_call.assert_has_calls(test_calls)
+
+        if ceph_version == '14.0.0':
+            mock_check_output.assert_called_once_with([
+                'sudo',
+                '-u', 'ceph',
+                'ceph',
+                '--name', 'mon.',
+                '--keyring',
+                '/var/lib/ceph/mon/ceph-{}/keyring'.format(
+                    test_hostname
+                ),
+                'auth', 'get', 'client.admin',
+            ])
+            mock_write_file.assert_called_with(
+                '/etc/ceph/ceph.client.admin.keyring',
+                'testkey', group='ceph', owner='ceph',
+                perms=0o400
+            )
+        else:
+            mock_check_output.assert_not_called()
+            mock_write_file.assert_not_called()
+
+    def test_create_keyrings(self):
+        self._test_create_keyrings()
+
+    def test_create_keyrings_luminous(self):
+        self._test_create_keyrings(ceph_version='12.0.0')
+
+    def test_create_keyrings_nautilus(self):
+        self._test_create_keyrings(ceph_version='14.0.0')
 
     @patch.object(utils, 'chownr')
     @patch.object(utils, 'cmp_pkgrevno')
@@ -786,6 +892,7 @@ class CephTestCase(unittest.TestCase):
             'hammer -> jewel',
             'jewel -> luminous',
             'luminous -> mimic',
+            'mimic -> nautilus',
         ])
         self.assertEqual(utils.pretty_print_upgrade_paths(), expected)
 

@@ -40,6 +40,7 @@ from charmhelpers.core.host import (
     service_start,
     service_stop,
     CompareHostReleases,
+    write_file,
 )
 from charmhelpers.core.hookenv import (
     cached,
@@ -950,13 +951,13 @@ def rescan_osd_devices():
 
     udevadm_settle()
 
-
+_client_admin_keyring = '/etc/ceph/ceph.client.admin.keyring'
 _bootstrap_keyring = "/var/lib/ceph/bootstrap-osd/ceph.keyring"
 _upgrade_keyring = "/var/lib/ceph/osd/ceph.client.osd-upgrade.keyring"
 
 
 def is_bootstrapped():
-    return os.path.exists(_bootstrap_keyring)
+    return os.path.exists(_client_admin_keyring)
 
 
 def wait_for_bootstrap():
@@ -1270,6 +1271,12 @@ def use_bluestore():
 
 
 def bootstrap_monitor_cluster(secret):
+    """Bootstrap local ceph mon into the ceph cluster
+
+    :param secret: cephx secret to use for monitor authentication
+    :type secret: str
+    :raises: Exception if ceph mon cannot be bootstrapped
+    """
     hostname = socket.gethostname()
     path = '/var/lib/ceph/mon/ceph-{}'.format(hostname)
     done = '{}/done'.format(path)
@@ -1290,21 +1297,35 @@ def bootstrap_monitor_cluster(secret):
               perms=0o755)
         # end changes for Ceph >= 0.61.3
         try:
-            add_keyring_to_ceph(keyring,
-                                secret,
-                                hostname,
-                                path,
-                                done,
-                                init_marker)
-
+            _create_monitor(keyring,
+                            secret,
+                            hostname,
+                            path,
+                            done,
+                            init_marker)
+            _create_keyrings()
         except:
             raise
         finally:
             os.unlink(keyring)
 
 
-@retry_on_exception(3, base_delay=5)
-def add_keyring_to_ceph(keyring, secret, hostname, path, done, init_marker):
+def _create_monitor(keyring, secret, hostname, path, done, init_marker):
+    """Create monitor filesystem and enable and start ceph-mon process
+
+    :param keyring: path to temporary keyring on disk
+    :type keyring: str
+    :param secret: cephx secret to use for monitor authentication
+    :type: secret: str
+    :param hostname: hostname of the local unit
+    :type hostname: str
+    :param path: full path to ceph mon directory
+    :type path: str
+    :param done: full path to 'done' marker for ceph mon
+    :type done: str
+    :param init_marker: full path to 'init' marker for ceph mon
+    :type init_marker: str
+    """
     subprocess.check_call(['ceph-authtool', keyring,
                            '--create-keyring', '--name=mon.',
                            '--add-key={}'.format(secret),
@@ -1320,39 +1341,72 @@ def add_keyring_to_ceph(keyring, secret, hostname, path, done, init_marker):
         pass
 
     if systemd():
-        subprocess.check_call(['systemctl', 'enable', 'ceph-mon'])
-        service_restart('ceph-mon')
+        if cmp_pkgrevno('ceph', '14.0.0') >= 0:
+            systemd_unit = 'ceph-mon@{}'.format(socket.gethostname())
+        else:
+            systemd_unit = 'ceph-mon'
+        subprocess.check_call(['systemctl', 'enable', systemd_unit])
+        service_restart(systemd_unit)
     else:
         service_restart('ceph-mon-all')
 
-    # NOTE(jamespage): Later ceph releases require explicit
-    #                  call to ceph-create-keys to setup the
-    #                  admin keys for the cluster; this command
-    #                  will wait for quorum in the cluster before
-    #                  returning.
-    # NOTE(fnordahl): Explicitly run `ceph-crate-keys` for older
-    #                 ceph releases too.  This improves bootstrap
-    #                 resilience as the charm will wait for
-    #                 presence of peer units before attempting
-    #                 to bootstrap.  Note that charms deploying
-    #                 ceph-mon service should disable running of
-    #                 `ceph-create-keys` service in init system.
-    cmd = ['ceph-create-keys', '--id', hostname]
-    if cmp_pkgrevno('ceph', '12.0.0') >= 0:
-        # NOTE(fnordahl): The default timeout in ceph-create-keys of 600
-        #                 seconds is not adequate.  Increase timeout when
-        #                 timeout parameter available.  For older releases
-        #                 we rely on retry_on_exception decorator.
-        #                 LP#1719436
-        cmd.extend(['--timeout', '1800'])
-    subprocess.check_call(cmd)
-    _client_admin_keyring = '/etc/ceph/ceph.client.admin.keyring'
-    osstat = os.stat(_client_admin_keyring)
-    if not osstat.st_size:
-        # NOTE(fnordahl): Retry will fail as long as this file exists.
-        #                 LP#1719436
-        os.remove(_client_admin_keyring)
-        raise Exception
+
+@retry_on_exception(3, base_delay=5)
+def _create_keyrings():
+    """Create keyrings for operation of ceph-mon units
+
+    :raises: Exception if keyrings cannot be created
+    """
+    if cmp_pkgrevno('ceph', '14.0.0') >= 0:
+        # NOTE(jamespage): At Nautilus, keys are created by the
+        #                  monitors automatically and just need
+        #                  exporting.
+        output = str(subprocess.check_output(
+            [
+                'sudo',
+                '-u', ceph_user(),
+                'ceph',
+                '--name', 'mon.',
+                '--keyring',
+                '/var/lib/ceph/mon/ceph-{}/keyring'.format(
+                    socket.gethostname()
+                ),
+                'auth', 'get', 'client.admin',
+            ]).decode('UTF-8')).strip()
+        if not output:
+            # NOTE: key not yet created, raise exception and retry
+            raise Exception
+        write_file(_client_admin_keyring, output,
+                   owner=ceph_user(), group=ceph_user(),
+                   perms=0o400)
+    else:
+        # NOTE(jamespage): Later ceph releases require explicit
+        #                  call to ceph-create-keys to setup the
+        #                  admin keys for the cluster; this command
+        #                  will wait for quorum in the cluster before
+        #                  returning.
+        # NOTE(fnordahl): Explicitly run `ceph-create-keys` for older
+        #                 ceph releases too.  This improves bootstrap
+        #                 resilience as the charm will wait for
+        #                 presence of peer units before attempting
+        #                 to bootstrap.  Note that charms deploying
+        #                 ceph-mon service should disable running of
+        #                 `ceph-create-keys` service in init system.
+        cmd = ['ceph-create-keys', '--id', socket.gethostname()]
+        if cmp_pkgrevno('ceph', '12.0.0') >= 0:
+            # NOTE(fnordahl): The default timeout in ceph-create-keys of 600
+            #                 seconds is not adequate.  Increase timeout when
+            #                 timeout parameter available.  For older releases
+            #                 we rely on retry_on_exception decorator.
+            #                 LP#1719436
+            cmd.extend(['--timeout', '1800'])
+        subprocess.check_call(cmd)
+        osstat = os.stat(_client_admin_keyring)
+        if not osstat.st_size:
+            # NOTE(fnordahl): Retry will fail as long as this file exists.
+            #                 LP#1719436
+            os.remove(_client_admin_keyring)
+            raise Exception
 
 
 def update_monfs():
@@ -2733,6 +2787,7 @@ UPGRADE_PATHS = collections.OrderedDict([
     ('hammer', 'jewel'),
     ('jewel', 'luminous'),
     ('luminous', 'mimic'),
+    ('mimic', 'nautilus'),
 ])
 
 # Map UCA codenames to ceph codenames
@@ -2748,6 +2803,7 @@ UCA_CODENAME_MAP = {
     'queens': 'luminous',
     'rocky': 'mimic',
     'stein': 'mimic',
+    'train': 'nautilus',
 }
 
 
