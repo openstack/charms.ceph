@@ -2147,6 +2147,13 @@ def roll_monitor_cluster(new_version, upgrade_key):
             wait_for_all_monitors_to_upgrade(new_version=new_version,
                                              upgrade_key=upgrade_key)
             bootstrap_manager()
+        # NOTE(icey)
+        # In Ceph Nautilus, the msgr2 messaging protocol is preferres
+        # so we enable it here after an upgrade. Any Ceph version after
+        # Nautilus should pick it up automatically as it should be set
+        # at bootstrap.
+        if new_version == 'nautilus':
+            setup_msgr2()
     except ValueError:
         log("Failed to find {} in list {}.".format(
             my_name, mon_sorted_list))
@@ -2928,6 +2935,16 @@ def bootstrap_manager():
         unit = 'ceph-mgr@{}'.format(hostname)
         subprocess.check_call(['systemctl', 'enable', unit])
         service_restart(unit)
+
+
+def setup_msgr2():
+    """
+    Update Ceph to use msr2.
+
+    :raises: subprocess.CalledProcessError if the command fails
+    """
+    cmd = ['ceph', 'mon', 'enable-msgr2']
+    subprocess.check_call(cmd)
 
 
 def osd_noout(enable):
