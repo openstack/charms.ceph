@@ -952,8 +952,6 @@ def rescan_osd_devices():
     udevadm_settle()
 
 _client_admin_keyring = '/etc/ceph/ceph.client.admin.keyring'
-_bootstrap_keyring = "/var/lib/ceph/bootstrap-osd/ceph.keyring"
-_upgrade_keyring = "/var/lib/ceph/osd/ceph.client.osd-upgrade.keyring"
 
 
 def is_bootstrapped():
@@ -963,36 +961,6 @@ def is_bootstrapped():
 def wait_for_bootstrap():
     while not is_bootstrapped():
         time.sleep(3)
-
-
-def import_osd_bootstrap_key(key):
-    if not os.path.exists(_bootstrap_keyring):
-        cmd = [
-            "sudo",
-            "-u",
-            ceph_user(),
-            'ceph-authtool',
-            _bootstrap_keyring,
-            '--create-keyring',
-            '--name=client.bootstrap-osd',
-            '--add-key={}'.format(key)
-        ]
-        subprocess.check_call(cmd)
-
-
-def import_osd_upgrade_key(key):
-    if not os.path.exists(_upgrade_keyring):
-        cmd = [
-            "sudo",
-            "-u",
-            ceph_user(),
-            'ceph-authtool',
-            _upgrade_keyring,
-            '--create-keyring',
-            '--name=client.osd-upgrade',
-            '--add-key={}'.format(key)
-        ]
-        subprocess.check_call(cmd)
 
 
 def generate_monitor_secret():
