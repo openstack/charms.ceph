@@ -70,7 +70,7 @@ host ip-172-31-30-0 {
 root default {
     id -1        # do not change unnecessarily
     # weight 0.009
-    alg straw
+    alg straw2
     hash 0    # rjenkins1
     item ip-172-31-33-152 weight 0.003
     item ip-172-31-54-117 weight 0.003
@@ -120,28 +120,28 @@ type 10 root
 host ip-172-31-33-152 {
     id -2        # do not change unnecessarily
     # weight 0.003
-    alg straw
+    alg straw2
     hash 0    # rjenkins1
     item osd.0 weight 0.003
 }
 host ip-172-31-54-117 {
     id -3        # do not change unnecessarily
     # weight 0.003
-    alg straw
+    alg straw2
     hash 0    # rjenkins1
     item osd.1 weight 0.003
 }
 host ip-172-31-30-0 {
     id -4        # do not change unnecessarily
     # weight 0.003
-    alg straw
+    alg straw2
     hash 0    # rjenkins1
     item osd.2 weight 0.003
 }
 root default {
     id -1        # do not change unnecessarily
     # weight 0.009
-    alg straw
+    alg straw2
     hash 0    # rjenkins1
     item ip-172-31-33-152 weight 0.003
     item ip-172-31-54-117 weight 0.003
@@ -191,28 +191,28 @@ type 10 root
 host ip-172-31-33-152 {
     id -2        # do not change unnecessarily
     # weight 0.003
-    alg straw
+    alg straw2
     hash 0    # rjenkins1
     item osd.0 weight 0.003
 }
 host ip-172-31-54-117 {
     id -3        # do not change unnecessarily
     # weight 0.003
-    alg straw
+    alg straw2
     hash 0    # rjenkins1
     item osd.1 weight 0.003
 }
 host ip-172-31-30-0 {
     id -4        # do not change unnecessarily
     # weight 0.003
-    alg straw
+    alg straw2
     hash 0    # rjenkins1
     item osd.2 weight 0.003
 }
 root default {
     id -1        # do not change unnecessarily
     # weight 0.009
-    alg straw
+    alg straw2
     hash 0    # rjenkins1
     item ip-172-31-33-152 weight 0.003
     item ip-172-31-54-117 weight 0.003
@@ -235,7 +235,7 @@ rule replicated_ruleset {
 root test {
     id -5    # do not change unnecessarily
     # weight 0.000
-    alg straw
+    alg straw2
     hash 0  # rjenkins1
 }
 
@@ -253,7 +253,7 @@ rule test {
 CRUSHMAP4 = """root fast {
     id -21    # do not change unnecessarily
     # weight 0.000
-    alg straw
+    alg straw2
     hash 0  # rjenkins1
 }
 
