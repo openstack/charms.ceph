@@ -57,7 +57,7 @@ class CephTestCase(unittest.TestCase):
                        _exists,
                        _call,
                        _pkgrevno):
-        _pkgrevno.return_value = True
+        _pkgrevno.side_effect = [1, -1]
         _isdir.return_value = False
         utils.start_osds(['/dev/sdb'])
         _isdir.assert_called_once_with('/dev/sdb')
@@ -194,6 +194,7 @@ class CephTestCase(unittest.TestCase):
         db.get.assert_called_with('osd-devices', [])
         db.set.assert_called_with('osd-devices', [])
 
+    @patch.object(utils, 'cmp_pkgrevno')
     @patch.object(utils, 'kv')
     @patch.object(utils.subprocess, 'check_call')
     @patch.object(utils.os.path, 'exists')
@@ -203,9 +204,11 @@ class CephTestCase(unittest.TestCase):
     @patch.object(utils, 'chownr')
     @patch.object(utils, 'ceph_user')
     def test_osdize_dir(self, _ceph_user, _chown, _mkdir,
-                        _cmp, _mounted, _exists, _call, _kv):
+                        _cmp, _mounted, _exists, _call, _kv,
+                        _cmp_pkgrevno):
         """Test that the dev osd is initialized correctly"""
         db = MagicMock()
+        _cmp_pkgrevno.side_effect = [-1, 1, 1, 1, 1]
         _kv.return_value = db
         db.get.return_value = []
         _ceph_user.return_value = "ceph"
@@ -219,6 +222,31 @@ class CephTestCase(unittest.TestCase):
 
         db.get.assert_called_with('osd-devices', [])
         db.set.assert_called_with('osd-devices', ['/srv/osd'])
+
+    @patch.object(utils, 'cmp_pkgrevno')
+    @patch.object(utils, 'kv')
+    @patch.object(utils.subprocess, 'check_call')
+    @patch.object(utils.os.path, 'exists')
+    @patch.object(utils, 'is_device_mounted')
+    @patch.object(utils, 'cmp_pkgrevno')
+    @patch.object(utils, 'mkdir')
+    @patch.object(utils, 'chownr')
+    @patch.object(utils, 'ceph_user')
+    def test_osdize_dir_nautilus(self, _ceph_user, _chown, _mkdir,
+                                 _cmp, _mounted, _exists, _call, _kv,
+                                 _cmp_pkgrevno):
+        """Test that the dev osd is initialized correctly"""
+        db = MagicMock()
+        _cmp_pkgrevno.side_effect = [1]
+        _kv.return_value = db
+        db.get.return_value = []
+        _ceph_user.return_value = "ceph"
+        _mounted.return_value = False
+        _exists.return_value = False
+        _cmp.return_value = True
+        utils.osdize('/srv/osd', osd_format='xfs', osd_journal=None,
+                     bluestore=False)
+        _call.assert_not_called()
 
     @patch.object(utils.subprocess, 'check_output')
     def test_get_osd_weight(self, output):

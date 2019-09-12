@@ -929,11 +929,13 @@ def is_osd_disk(dev):
 def start_osds(devices):
     # Scan for ceph block devices
     rescan_osd_devices()
-    if cmp_pkgrevno('ceph', "0.56.6") >= 0:
-        # Use ceph-disk activate for directory based OSD's
-        for dev_or_path in devices:
-            if os.path.exists(dev_or_path) and os.path.isdir(dev_or_path):
-                subprocess.check_call(['ceph-disk', 'activate', dev_or_path])
+    if (cmp_pkgrevno('ceph', '0.56.6') >= 0 and
+            cmp_pkgrevno('ceph', '14.2.0') < 0):
+            # Use ceph-disk activate for directory based OSD's
+            for dev_or_path in devices:
+                if os.path.exists(dev_or_path) and os.path.isdir(dev_or_path):
+                    subprocess.check_call(
+                        ['ceph-disk', 'activate', dev_or_path])
 
 
 def udevadm_settle():
@@ -955,7 +957,8 @@ _client_admin_keyring = '/etc/ceph/ceph.client.admin.keyring'
 
 
 def is_bootstrapped():
-    return os.path.exists(_client_admin_keyring)
+    return os.path.exists(
+        '/var/lib/ceph/mon/ceph-{}/done'.format(socket.gethostname()))
 
 
 def wait_for_bootstrap():
@@ -1459,6 +1462,10 @@ def osdize(dev, osd_format, osd_journal, ignore_errors=False, encrypt=False,
                    ignore_errors, encrypt,
                    bluestore, key_manager)
     else:
+        if cmp_pkgrevno('ceph', '14.0.0') >= 0:
+            log("Directory backed OSDs can not be created on Nautilus",
+                level=WARNING)
+            return
         osdize_dir(dev, encrypt, bluestore)
 
 
