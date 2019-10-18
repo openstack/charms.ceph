@@ -793,10 +793,31 @@ def is_leader():
         return False
 
 
+def manager_available():
+    # if manager daemon isn't on this release, just say it is Fine
+    if cmp_pkgrevno('ceph', '11.0.0') < 0:
+        return True
+    cmd = ["sudo", "-u", "ceph", "ceph", "mgr", "dump", "-f", "json"]
+    try:
+        result = json.loads(subprocess.check_output(cmd).decode('UTF-8'))
+        return result['available']
+    except subprocess.CalledProcessError as e:
+        log("'{}' failed: {}".format(" ".join(cmd), str(e)))
+        return False
+    except Exception:
+        return False
+
+
 def wait_for_quorum():
     while not is_quorum():
         log("Waiting for quorum to be reached")
         time.sleep(3)
+
+
+def wait_for_manager():
+    while not manager_available():
+        log("Waiting for manager to be available")
+        time.sleep(5)
 
 
 def add_bootstrap_hint(peer):
