@@ -661,7 +661,6 @@ class CephTestCase(unittest.TestCase):
                          utils.determine_packages())
 
     @patch.object(utils, '_create_monitor')
-    @patch.object(utils, '_create_keyrings')
     @patch.object(utils, 'ceph_user')
     @patch.object(utils, 'os')
     @patch.object(utils, 'systemd')
@@ -672,7 +671,6 @@ class CephTestCase(unittest.TestCase):
                                        mock_systemd,
                                        mock_os,
                                        mock_ceph_user,
-                                       mock_create_keyrings,
                                        mock_create_monitor):
         test_hostname = utils.socket.gethostname()
         test_secret = 'mysecret'
@@ -701,7 +699,6 @@ class CephTestCase(unittest.TestCase):
             test_done,
             test_init_marker,
         )
-        mock_create_keyrings.assert_called_once_with()
         mock_os.unlink.assert_called_with(test_keyring)
 
     @patch.object(utils, 'systemd')
@@ -810,7 +807,7 @@ class CephTestCase(unittest.TestCase):
                 call(['ceph-create-keys', '--id', test_hostname])
             )
 
-        utils._create_keyrings()
+        utils.create_keyrings()
 
         mock_check_call.assert_has_calls(test_calls)
 

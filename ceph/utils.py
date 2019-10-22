@@ -29,7 +29,6 @@ from datetime import datetime
 
 from charmhelpers.core import hookenv
 from charmhelpers.core import templating
-from charmhelpers.core.decorators import retry_on_exception
 from charmhelpers.core.host import (
     chownr,
     cmp_pkgrevno,
@@ -1295,7 +1294,6 @@ def bootstrap_monitor_cluster(secret):
                             path,
                             done,
                             init_marker)
-            _create_keyrings()
         except:
             raise
         finally:
@@ -1343,9 +1341,10 @@ def _create_monitor(keyring, secret, hostname, path, done, init_marker):
         service_restart('ceph-mon-all')
 
 
-@retry_on_exception(3, base_delay=5)
-def _create_keyrings():
+def create_keyrings():
     """Create keyrings for operation of ceph-mon units
+
+    NOTE: The quorum should be done before to execute this function.
 
     :raises: Exception if keyrings cannot be created
     """
