@@ -6,5 +6,5 @@ nose
 mock>=1.2
 flake8>=2.2.4,<=2.4.1
 stestr
-requests==2.6.0
+requests==2.20.0
 netifaces
