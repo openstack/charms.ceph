@@ -105,6 +105,72 @@ class CephBrokerTestCase(unittest.TestCase):
             value=json.dumps({"pools": ["glance"], "services": []},
                              sort_keys=True))
 
+    @patch.object(ceph.broker, 'handle_set_key_permissions')
+    @patch.object(ceph.broker, 'log')
+    def test_process_requests_set_perms(self, mock_log,
+                                        handle_set_key_permissions):
+        request = {
+            "api-version": 1,
+            "request-id": "0155c14b",
+            "ops": [
+                {
+                    "client": "manila-ganesha",
+                    "op": "set-key-permissions",
+                    "permissions": [
+                        "mds 'allow *'",
+                        "osd 'allow rw'",
+                    ]
+                }
+            ]
+        }
+        reqs = json.dumps(request)
+        rc = ceph.broker.process_requests(reqs)
+        handle_set_key_permissions.assert_called_once_with(
+            request={
+                u'client': u'manila-ganesha',
+                u'op': u'set-key-permissions',
+                u'permissions': [
+                    u"mds 'allow *'",
+                    u"osd 'allow rw'",
+                ]},
+            service='admin')
+        self.assertEqual(
+            json.loads(rc),
+            {'exit-code': 0, u'request-id': u'0155c14b'})
+
+    @patch.object(ceph.broker, 'check_call')
+    def test_handle_set_key_permissions(self, _check_call):
+        ceph.broker.handle_set_key_permissions(
+            request={
+                u'client': u'manila-ganesha',
+                u'op': u'set-key-permissions',
+                u'permissions': [
+                    u"mds 'allow *'",
+                    u"osd 'allow rw'",
+                ]},
+            service='admin')
+        expected = ['ceph', '--id', 'admin', 'auth', 'caps',
+                    'client.manila-ganesha', "mds 'allow *'", "osd 'allow rw'"]
+        _check_call.assert_called_once_with(expected)
+
+    @patch.object(ceph.broker, 'check_call')
+    def test_set_key_permission(self, _check_call):
+        request = {
+            u'client': u'manila-ganesha',
+            u'op': u'set-key-permissions',
+            u'permissions': [
+                u"mds 'allow *'",
+                u"osd 'allow rw'",
+            ]}
+        service = 'admin'
+        ceph.broker.handle_set_key_permissions(request=request,
+                                               service=service)
+        _check_call.assert_called_once_with([
+            'ceph',
+            '--id', 'admin',
+            'auth', 'caps',
+            'client.manila-ganesha', "mds 'allow *'", "osd 'allow rw'"])
+
     def test_pool_permission_list_for_service(self):
         service = {
             'group_names': {'rwx': ['images']},
