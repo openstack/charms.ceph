@@ -1867,6 +1867,17 @@ class CephGetLVSTestCase(unittest.TestCase):
         self.assertEqual(result, True)
 
     @patch.object(utils, 'log')
+    def test_is_pristine_disk_oserror(self, _log):
+        fake_open = mock_open()
+        oserror_exception = OSError('error')
+        fake_open.side_effect = oserror_exception
+        with patch('ceph.utils.open', fake_open):
+            result = utils.is_pristine_disk('/dev/sr0')
+        fake_open.assert_called_with('/dev/sr0', 'rb')
+        _log.assert_called_with(oserror_exception)
+        self.assertEqual(result, False)
+
+    @patch.object(utils, 'log')
     def test_is_pristine_disk_short_read(self, _log):
         data = b'\0' * 2047
         fake_open = mock_open(read_data=data)
