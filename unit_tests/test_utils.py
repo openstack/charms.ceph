@@ -515,14 +515,20 @@ class CephTestCase(unittest.TestCase):
         dev3 = MagicMock(spec=TestDevice)
         dev3.__getitem__.return_value = "block"
         dev3.device_node = '/dev/loop1'
-        devices = [dev1, dev2, dev3]
+        dev4 = MagicMock(spec=TestDevice)
+        dev4.__getitem__.return_value = "block"
+        dev4.device_node = '/dev/sdm'
+        dev5 = MagicMock(spec=TestDevice)
+        dev5.__getitem__.return_value = "block"
+        dev5.device_node = '/dev/dm-1'
+        devices = [dev1, dev2, dev3, dev4, dev5]
         with patch(
                 'pyudev.Context.list_devices',
                 return_value=devices):
             with patch.object(utils, 'is_device_mounted',
                               return_value=False):
                 devices = utils.unmounted_disks()
-                self.assertEqual(devices, ['/dev/sda', '/dev/sdb'])
+                self.assertEqual(devices, ['/dev/sda', '/dev/sdb', '/dev/sdm'])
             with patch.object(utils, 'is_device_mounted',
                               return_value=True):
                 devices = utils.unmounted_disks()
