@@ -62,6 +62,8 @@ def monitor_key_side_effect(*args):
 
 
 class UpgradeRollingTestCase(unittest.TestCase):
+
+    @patch.object(ceph.utils, 'determine_packages')
     @patch.object(ceph.utils, 'dirs_need_ownership_update')
     @patch.object(ceph.utils, 'apt_install')
     @patch.object(ceph.utils, 'chownr')
@@ -77,7 +79,8 @@ class UpgradeRollingTestCase(unittest.TestCase):
     def test_upgrade_osd_hammer(self, config, get_version, systemd, local_osds,
                                 add_source, apt_update, status_set, log,
                                 service_restart, chownr, apt_install,
-                                dirs_need_ownership_update):
+                                dirs_need_ownership_update,
+                                _determine_packages):
         config.side_effect = config_side_effect
         get_version.side_effect = [0.80, 0.94]
         systemd.return_value = False
@@ -98,6 +101,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
         # Make sure on an Upgrade to Hammer that chownr was NOT called.
         assert not chownr.called
 
+    @patch.object(ceph.utils, 'determine_packages')
     @patch.object(ceph.utils, '_upgrade_single_osd')
     @patch.object(ceph.utils, 'update_owner')
     @patch('os.listdir')
@@ -116,7 +120,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
                                local_osds, add_source, apt_update, status_set,
                                log, apt_install, dirs_need_ownership_update,
                                _get_child_dirs, listdir, update_owner,
-                               _upgrade_single_osd):
+                               _upgrade_single_osd, _determine_packages):
         config.side_effect = config_side_effect
         get_version.side_effect = [0.94, 10.1]
         systemd.return_value = False
@@ -147,6 +151,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
             ]
         )
 
+    @patch.object(ceph.utils, 'determine_packages')
     @patch.object(ceph.utils, 'service_restart')
     @patch.object(ceph.utils, '_upgrade_single_osd')
     @patch.object(ceph.utils, 'update_owner')
@@ -169,7 +174,8 @@ class UpgradeRollingTestCase(unittest.TestCase):
                                   apt_install,
                                   dirs_need_ownership_update,
                                   _get_child_dirs, listdir, update_owner,
-                                  _upgrade_single_osd, service_restart):
+                                  _upgrade_single_osd, service_restart,
+                                  _determine_packages):
         config.side_effect = config_side_effect
         get_version.side_effect = [10.2, 12.2]
         systemd.return_value = True

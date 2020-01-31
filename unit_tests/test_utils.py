@@ -662,8 +662,10 @@ class CephTestCase(unittest.TestCase):
         mock_reweight.assert_called_once_with(
             ['ceph', 'osd', 'crush', 'reweight', 'osd.0', '1'], stderr=-2)
 
-    def test_determine_packages(self):
-        self.assertEqual(utils.PACKAGES,
+    @patch.object(utils, 'lsb_release')
+    def test_determine_packages(self, _lsb_release):
+        _lsb_release.return_value = {'DISTRIB_CODENAME': 'bionic'}
+        self.assertEqual(utils.PACKAGES + ['btrfs-tools'],
                          utils.determine_packages())
 
     @patch.object(utils, '_create_monitor')

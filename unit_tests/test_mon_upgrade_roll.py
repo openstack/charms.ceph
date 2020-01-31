@@ -76,6 +76,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
                      'mon_ip-192-168-1-2_hammer_done 1473279502.69'),
             ])
 
+    @patch.object(ceph.utils, 'determine_packages')
     @patch.object(ceph.utils, 'ceph_user')
     @patch.object(ceph.utils, 'socket')
     @patch.object(ceph.utils, 'mkdir')
@@ -96,7 +97,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
                                     apt_update, status_set, log,
                                     service_start, service_stop, chownr,
                                     apt_install, mkdir, socket,
-                                    ceph_user):
+                                    ceph_user, _determine_packages):
         get_version.side_effect = [0.80, 0.94]
         config.side_effect = config_side_effect
         systemd.return_value = False
@@ -124,6 +125,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
                                  perms=0o755)
         chownr.assert_not_called()
 
+    @patch.object(ceph.utils, 'determine_packages')
     @patch.object(ceph.utils, 'ceph_user')
     @patch.object(ceph.utils, 'socket')
     @patch.object(ceph.utils, 'mkdir')
@@ -144,7 +146,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
                                    apt_update, status_set, log,
                                    service_start, service_stop, chownr,
                                    apt_install, mkdir, socket,
-                                   ceph_user):
+                                   ceph_user, _determine_packages):
         get_version.side_effect = [0.94, 10.1]
         config.side_effect = config_side_effect
         systemd.return_value = False
@@ -177,6 +179,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
                                  group='ceph',
                                  perms=0o755)
 
+    @patch.object(ceph.utils, 'determine_packages')
     @patch.object(ceph.utils, 'ceph_user')
     @patch.object(ceph.utils, 'socket')
     @patch.object(ceph.utils, 'mkdir')
@@ -196,7 +199,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
                                       apt_update, status_set, log,
                                       service_start, service_stop, chownr,
                                       apt_install, mkdir, socket,
-                                      ceph_user):
+                                      ceph_user, _determine_packages):
         get_version.side_effect = [10.2, 12.2]
         config.side_effect = config_side_effect
         socket.gethostname.return_value = 'testmon'
