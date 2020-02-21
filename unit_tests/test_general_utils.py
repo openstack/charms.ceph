@@ -16,22 +16,22 @@ import unittest
 
 from mock import patch
 
-import ceph.utils
+import charms_ceph.utils
 
 
 class GeneralUtilsTestCase(unittest.TestCase):
     def setUp(self):
         super(GeneralUtilsTestCase, self).setUp()
 
-    @patch.object(ceph.utils.subprocess, 'call')
+    @patch.object(charms_ceph.utils.subprocess, 'call')
     def test_udevadm_settle(self, _call):
-        ceph.utils.udevadm_settle()
+        charms_ceph.utils.udevadm_settle()
         _call.assert_called_once_with(['udevadm', 'settle'])
 
-    @patch.object(ceph.utils, 'udevadm_settle')
-    @patch.object(ceph.utils.subprocess, 'call')
+    @patch.object(charms_ceph.utils, 'udevadm_settle')
+    @patch.object(charms_ceph.utils.subprocess, 'call')
     def test_rescan_osd_devices(self, _call, _udevadm_settle):
-        ceph.utils.rescan_osd_devices()
+        charms_ceph.utils.rescan_osd_devices()
         _call.assert_called_once_with([
             'udevadm',
             'trigger',

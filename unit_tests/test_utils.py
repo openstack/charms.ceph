@@ -23,7 +23,7 @@ from mock import (
     patch,
 )
 
-import ceph.utils as utils
+import charms_ceph.utils as utils
 
 from subprocess import CalledProcessError
 
@@ -755,7 +755,7 @@ class CephTestCase(unittest.TestCase):
         ]
 
         fake_open = mock_open()
-        with patch('ceph.utils.open', fake_open, create=True):
+        with patch('charms_ceph.utils.open', fake_open, create=True):
             utils._create_monitor(
                 test_keyring,
                 test_secret,
@@ -888,7 +888,7 @@ class CephTestCase(unittest.TestCase):
         ]
 
         fake_open = mock_open()
-        with patch('ceph.open', fake_open, create=True):
+        with patch('charms_ceph.open', fake_open, create=True):
             utils.bootstrap_manager()
 
         self.assertEqual(
@@ -1868,7 +1868,7 @@ class CephGetLVSTestCase(unittest.TestCase):
     def test_is_pristine_disk(self, _log):
         data = b'\0' * 2048
         fake_open = mock_open(read_data=data)
-        with patch('ceph.utils.open', fake_open):
+        with patch('charms_ceph.utils.open', fake_open):
             result = utils.is_pristine_disk('/dev/vdz')
         fake_open.assert_called_with('/dev/vdz', 'rb')
         self.assertFalse(_log.called)
@@ -1879,7 +1879,7 @@ class CephGetLVSTestCase(unittest.TestCase):
         fake_open = mock_open()
         oserror_exception = OSError('error')
         fake_open.side_effect = oserror_exception
-        with patch('ceph.utils.open', fake_open):
+        with patch('charms_ceph.utils.open', fake_open):
             result = utils.is_pristine_disk('/dev/sr0')
         fake_open.assert_called_with('/dev/sr0', 'rb')
         _log.assert_called_with(oserror_exception)
@@ -1889,7 +1889,7 @@ class CephGetLVSTestCase(unittest.TestCase):
     def test_is_pristine_disk_short_read(self, _log):
         data = b'\0' * 2047
         fake_open = mock_open(read_data=data)
-        with patch('ceph.utils.open', fake_open):
+        with patch('charms_ceph.utils.open', fake_open):
             result = utils.is_pristine_disk('/dev/vdz')
         fake_open.assert_called_with('/dev/vdz', 'rb')
         _log.assert_called_with(
@@ -1901,7 +1901,7 @@ class CephGetLVSTestCase(unittest.TestCase):
         data = b'\0' * 2047
         data = data + b'\42'
         fake_open = mock_open(read_data=data)
-        with patch('ceph.utils.open', fake_open):
+        with patch('charms_ceph.utils.open', fake_open):
             result = utils.is_pristine_disk('/dev/vdz')
         fake_open.assert_called_with('/dev/vdz', 'rb')
         self.assertEqual(result, False)

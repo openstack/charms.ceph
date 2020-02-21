@@ -16,14 +16,14 @@ import unittest
 
 from mock import patch
 
-import ceph.utils
+import charms_ceph.utils
 
 
 class DiskTuningTestCase(unittest.TestCase):
     def setUp(self):
         super(DiskTuningTestCase, self).setUp()
 
-    @patch.object(ceph.utils, 'templating')
+    @patch.object(charms_ceph.utils, 'templating')
     def test_persist_settings(self, _templating):
         renderer = _templating.render
         settings = {
@@ -33,13 +33,13 @@ class DiskTuningTestCase(unittest.TestCase):
                 }
             }
         }
-        ceph.utils.persist_settings(settings)
+        charms_ceph.utils.persist_settings(settings)
         renderer.assert_called_once_with(source='hdparm.conf',
-                                         target=ceph.utils.HDPARM_FILE,
+                                         target=charms_ceph.utils.HDPARM_FILE,
                                          context=settings)
 
-    @patch.object(ceph.utils, 'templating')
+    @patch.object(charms_ceph.utils, 'templating')
     def test_persist_settings_empty_dict(self, _templating):
         renderer = _templating.render
-        ceph.utils.persist_settings({})
+        charms_ceph.utils.persist_settings({})
         assert not renderer.called, 'renderer should not have been called'

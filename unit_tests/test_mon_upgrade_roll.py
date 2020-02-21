@@ -18,7 +18,7 @@ import unittest
 
 from mock import patch, call, MagicMock
 
-import ceph.utils
+import charms_ceph.utils
 
 # python-apt is not installed as part of test-requirements but is imported by
 # some charmhelpers modules so create a fake import.
@@ -55,16 +55,16 @@ def monitor_key_side_effect(*args):
 class UpgradeRollingTestCase(unittest.TestCase):
 
     @patch('time.time')
-    @patch.object(ceph.utils, 'log')
-    @patch.object(ceph.utils, 'upgrade_monitor')
-    @patch.object(ceph.utils, 'monitor_key_set')
+    @patch.object(charms_ceph.utils, 'log')
+    @patch.object(charms_ceph.utils, 'upgrade_monitor')
+    @patch.object(charms_ceph.utils, 'monitor_key_set')
     def test_lock_and_roll(self, monitor_key_set, upgrade_monitor, log, time):
         time.return_value = 1473279502.69
         monitor_key_set.monitor_key_set.return_value = None
-        ceph.utils.lock_and_roll(my_name='ip-192-168-1-2',
-                                 version='hammer',
-                                 service='mon',
-                                 upgrade_key='admin')
+        charms_ceph.utils.lock_and_roll(my_name='ip-192-168-1-2',
+                                        version='hammer',
+                                        service='mon',
+                                        upgrade_key='admin')
         upgrade_monitor.assert_called_once_with('hammer')
         log.assert_has_calls(
             [
@@ -76,22 +76,22 @@ class UpgradeRollingTestCase(unittest.TestCase):
                      'mon_ip-192-168-1-2_hammer_done 1473279502.69'),
             ])
 
-    @patch.object(ceph.utils, 'determine_packages')
-    @patch.object(ceph.utils, 'ceph_user')
-    @patch.object(ceph.utils, 'socket')
-    @patch.object(ceph.utils, 'mkdir')
-    @patch.object(ceph.utils, 'apt_install')
-    @patch.object(ceph.utils, 'chownr')
-    @patch.object(ceph.utils, 'service_stop')
-    @patch.object(ceph.utils, 'service_start')
-    @patch.object(ceph.utils, 'log')
-    @patch.object(ceph.utils, 'status_set')
-    @patch.object(ceph.utils, 'apt_update')
-    @patch.object(ceph.utils, 'add_source')
-    @patch.object(ceph.utils, 'get_local_mon_ids')
-    @patch.object(ceph.utils, 'systemd')
-    @patch.object(ceph.utils, 'get_version')
-    @patch.object(ceph.utils, 'config')
+    @patch.object(charms_ceph.utils, 'determine_packages')
+    @patch.object(charms_ceph.utils, 'ceph_user')
+    @patch.object(charms_ceph.utils, 'socket')
+    @patch.object(charms_ceph.utils, 'mkdir')
+    @patch.object(charms_ceph.utils, 'apt_install')
+    @patch.object(charms_ceph.utils, 'chownr')
+    @patch.object(charms_ceph.utils, 'service_stop')
+    @patch.object(charms_ceph.utils, 'service_start')
+    @patch.object(charms_ceph.utils, 'log')
+    @patch.object(charms_ceph.utils, 'status_set')
+    @patch.object(charms_ceph.utils, 'apt_update')
+    @patch.object(charms_ceph.utils, 'add_source')
+    @patch.object(charms_ceph.utils, 'get_local_mon_ids')
+    @patch.object(charms_ceph.utils, 'systemd')
+    @patch.object(charms_ceph.utils, 'get_version')
+    @patch.object(charms_ceph.utils, 'config')
     def test_upgrade_monitor_hammer(self, config, get_version,
                                     systemd, local_mons, add_source,
                                     apt_update, status_set, log,
@@ -105,7 +105,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
         ceph_user.return_value = 'root'
         local_mons.return_value = ['a']
 
-        ceph.utils.upgrade_monitor('hammer')
+        charms_ceph.utils.upgrade_monitor('hammer')
         service_stop.assert_called_with('ceph-mon-all')
         service_start.assert_called_with('ceph-mon-all')
         add_source.assert_called_with('cloud:trusty-kilo', 'key')
@@ -125,22 +125,22 @@ class UpgradeRollingTestCase(unittest.TestCase):
                                  perms=0o755)
         chownr.assert_not_called()
 
-    @patch.object(ceph.utils, 'determine_packages')
-    @patch.object(ceph.utils, 'ceph_user')
-    @patch.object(ceph.utils, 'socket')
-    @patch.object(ceph.utils, 'mkdir')
-    @patch.object(ceph.utils, 'apt_install')
-    @patch.object(ceph.utils, 'chownr')
-    @patch.object(ceph.utils, 'service_stop')
-    @patch.object(ceph.utils, 'service_start')
-    @patch.object(ceph.utils, 'log')
-    @patch.object(ceph.utils, 'status_set')
-    @patch.object(ceph.utils, 'apt_update')
-    @patch.object(ceph.utils, 'add_source')
-    @patch.object(ceph.utils, 'get_local_mon_ids')
-    @patch.object(ceph.utils, 'systemd')
-    @patch.object(ceph.utils, 'get_version')
-    @patch.object(ceph.utils, 'config')
+    @patch.object(charms_ceph.utils, 'determine_packages')
+    @patch.object(charms_ceph.utils, 'ceph_user')
+    @patch.object(charms_ceph.utils, 'socket')
+    @patch.object(charms_ceph.utils, 'mkdir')
+    @patch.object(charms_ceph.utils, 'apt_install')
+    @patch.object(charms_ceph.utils, 'chownr')
+    @patch.object(charms_ceph.utils, 'service_stop')
+    @patch.object(charms_ceph.utils, 'service_start')
+    @patch.object(charms_ceph.utils, 'log')
+    @patch.object(charms_ceph.utils, 'status_set')
+    @patch.object(charms_ceph.utils, 'apt_update')
+    @patch.object(charms_ceph.utils, 'add_source')
+    @patch.object(charms_ceph.utils, 'get_local_mon_ids')
+    @patch.object(charms_ceph.utils, 'systemd')
+    @patch.object(charms_ceph.utils, 'get_version')
+    @patch.object(charms_ceph.utils, 'config')
     def test_upgrade_monitor_jewel(self, config, get_version,
                                    systemd, local_mons, add_source,
                                    apt_update, status_set, log,
@@ -154,7 +154,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
         ceph_user.return_value = 'ceph'
         local_mons.return_value = ['a']
 
-        ceph.utils.upgrade_monitor('jewel')
+        charms_ceph.utils.upgrade_monitor('jewel')
         service_stop.assert_called_with('ceph-mon-all')
         service_start.assert_called_with('ceph-mon-all')
         add_source.assert_called_with('cloud:trusty-kilo', 'key')
@@ -179,21 +179,21 @@ class UpgradeRollingTestCase(unittest.TestCase):
                                  group='ceph',
                                  perms=0o755)
 
-    @patch.object(ceph.utils, 'determine_packages')
-    @patch.object(ceph.utils, 'ceph_user')
-    @patch.object(ceph.utils, 'socket')
-    @patch.object(ceph.utils, 'mkdir')
-    @patch.object(ceph.utils, 'apt_install')
-    @patch.object(ceph.utils, 'chownr')
-    @patch.object(ceph.utils, 'service_stop')
-    @patch.object(ceph.utils, 'service_start')
-    @patch.object(ceph.utils, 'log')
-    @patch.object(ceph.utils, 'status_set')
-    @patch.object(ceph.utils, 'apt_update')
-    @patch.object(ceph.utils, 'add_source')
-    @patch.object(ceph.utils, 'systemd')
-    @patch.object(ceph.utils, 'get_version')
-    @patch.object(ceph.utils, 'config')
+    @patch.object(charms_ceph.utils, 'determine_packages')
+    @patch.object(charms_ceph.utils, 'ceph_user')
+    @patch.object(charms_ceph.utils, 'socket')
+    @patch.object(charms_ceph.utils, 'mkdir')
+    @patch.object(charms_ceph.utils, 'apt_install')
+    @patch.object(charms_ceph.utils, 'chownr')
+    @patch.object(charms_ceph.utils, 'service_stop')
+    @patch.object(charms_ceph.utils, 'service_start')
+    @patch.object(charms_ceph.utils, 'log')
+    @patch.object(charms_ceph.utils, 'status_set')
+    @patch.object(charms_ceph.utils, 'apt_update')
+    @patch.object(charms_ceph.utils, 'add_source')
+    @patch.object(charms_ceph.utils, 'systemd')
+    @patch.object(charms_ceph.utils, 'get_version')
+    @patch.object(charms_ceph.utils, 'config')
     def test_upgrade_monitor_luminous(self, config, get_version,
                                       systemd, add_source,
                                       apt_update, status_set, log,
@@ -206,7 +206,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
         ceph_user.return_value = 'ceph'
         systemd.return_value = True
 
-        ceph.utils.upgrade_monitor('luminous')
+        charms_ceph.utils.upgrade_monitor('luminous')
         service_stop.assert_called_with('ceph-mon')
         service_start.assert_called_with('ceph-mon')
         add_source.assert_called_with('cloud:trusty-kilo', 'key')
@@ -226,13 +226,13 @@ class UpgradeRollingTestCase(unittest.TestCase):
                                  group='ceph',
                                  perms=0o755)
 
-    @patch.object(ceph.utils, 'bootstrap_manager')
-    @patch.object(ceph.utils, 'wait_for_all_monitors_to_upgrade')
-    @patch.object(ceph.utils, 'status_set')
-    @patch.object(ceph.utils, 'lock_and_roll')
-    @patch.object(ceph.utils, 'wait_on_previous_node')
-    @patch.object(ceph.utils, 'get_mon_map')
-    @patch.object(ceph.utils, 'socket')
+    @patch.object(charms_ceph.utils, 'bootstrap_manager')
+    @patch.object(charms_ceph.utils, 'wait_for_all_monitors_to_upgrade')
+    @patch.object(charms_ceph.utils, 'status_set')
+    @patch.object(charms_ceph.utils, 'lock_and_roll')
+    @patch.object(charms_ceph.utils, 'wait_on_previous_node')
+    @patch.object(charms_ceph.utils, 'get_mon_map')
+    @patch.object(charms_ceph.utils, 'socket')
     def _test_roll_monitor_cluster(self,
                                    socket,
                                    get_mon_map,
@@ -255,8 +255,8 @@ class UpgradeRollingTestCase(unittest.TestCase):
                 ]
             }
         }
-        ceph.utils.roll_monitor_cluster(new_version=new_version,
-                                        upgrade_key='admin')
+        charms_ceph.utils.roll_monitor_cluster(new_version=new_version,
+                                               upgrade_key='admin')
         get_mon_map.assert_called_once_with('admin')
         wait_on_previous_node.assert_called_with(
             upgrade_key='admin',
@@ -290,10 +290,10 @@ class UpgradeRollingTestCase(unittest.TestCase):
     def test_roll_monitor_cluster_hammer(self):
         self._test_roll_monitor_cluster(new_version='hammer')
 
-    @patch.object(ceph.utils, 'log')
-    @patch.object(ceph.utils, 'time')
-    @patch.object(ceph.utils, 'monitor_key_get')
-    @patch.object(ceph.utils, 'monitor_key_exists')
+    @patch.object(charms_ceph.utils, 'log')
+    @patch.object(charms_ceph.utils, 'time')
+    @patch.object(charms_ceph.utils, 'monitor_key_get')
+    @patch.object(charms_ceph.utils, 'monitor_key_exists')
     def test_wait_on_previous_node(self, monitor_key_exists, monitor_key_get,
                                    mock_time, log):
         tval = [previous_node_start_time]
@@ -306,10 +306,12 @@ class UpgradeRollingTestCase(unittest.TestCase):
         monitor_key_get.side_effect = monitor_key_side_effect
         monitor_key_exists.return_value = False
 
-        ceph.utils.wait_on_previous_node(previous_node="ip-192-168-1-2",
-                                         version='0.94.1',
-                                         service='mon',
-                                         upgrade_key='admin')
+        charms_ceph.utils.wait_on_previous_node(
+            previous_node="ip-192-168-1-2",
+            version='0.94.1',
+            service='mon',
+            upgrade_key='admin'
+        )
 
         # Make sure we checked to see if the previous node started
         monitor_key_get.assert_has_calls(

@@ -14,7 +14,7 @@
 
 import unittest
 
-import ceph.crush_utils
+import charms_ceph.crush_utils
 
 from mock import patch
 
@@ -272,32 +272,33 @@ class CephCrushmapTests(unittest.TestCase):
     def setUp(self):
         super(CephCrushmapTests, self).setUp()
 
-    @patch.object(ceph.crush_utils.Crushmap, 'load_crushmap')
+    @patch.object(charms_ceph.crush_utils.Crushmap, 'load_crushmap')
     def test_crushmap_buckets(self, load_crushmap):
         load_crushmap.return_value = ""
-        crushmap = ceph.crush_utils.Crushmap()
+        crushmap = charms_ceph.crush_utils.Crushmap()
         crushmap.add_bucket("test")
         self.assertEqual(
-            crushmap.buckets(), [ceph.crush_utils.CRUSHBucket("test", -1)])
+            crushmap.buckets(),
+            [charms_ceph.crush_utils.CRUSHBucket("test", -1)])
 
-    @patch.object(ceph.crush_utils.Crushmap, 'load_crushmap')
+    @patch.object(charms_ceph.crush_utils.Crushmap, 'load_crushmap')
     def test_parsed_crushmap(self, load_crushmap):
         load_crushmap.return_value = CRUSHMAP1
-        crushmap = ceph.crush_utils.Crushmap()
+        crushmap = charms_ceph.crush_utils.Crushmap()
         self.assertEqual(
-            [ceph.crush_utils.CRUSHBucket("default", -1, True)],
+            [charms_ceph.crush_utils.CRUSHBucket("default", -1, True)],
             crushmap.buckets())
         self.assertEqual([-4, -3, -2, -1], crushmap._ids)
 
-    @patch.object(ceph.crush_utils.Crushmap, 'load_crushmap')
+    @patch.object(charms_ceph.crush_utils.Crushmap, 'load_crushmap')
     def test_build_crushmap(self, load_crushmap):
         load_crushmap.return_value = CRUSHMAP2
         expected = CRUSHMAP3
-        crushmap = ceph.crush_utils.Crushmap()
+        crushmap = charms_ceph.crush_utils.Crushmap()
         crushmap.add_bucket("test")
         self.assertEqual(expected, crushmap.build_crushmap())
 
     def test_crushmap_string(self):
-        result = ceph.crush_utils.Crushmap.bucket_string("fast", -21)
+        result = charms_ceph.crush_utils.Crushmap.bucket_string("fast", -21)
         expected = CRUSHMAP4
         self.assertEqual(expected, result)

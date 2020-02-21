@@ -14,4 +14,4 @@
 
 import sys
 
-sys.path.append('ceph')
+sys.path.append('charms_ceph')
