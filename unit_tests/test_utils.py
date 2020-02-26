@@ -833,7 +833,7 @@ class CephTestCase(unittest.TestCase):
             ])
             mock_write_file.assert_called_with(
                 '/etc/ceph/ceph.client.admin.keyring',
-                'testkey', group='ceph', owner='ceph',
+                'testkey\n', group='ceph', owner='ceph',
                 perms=0o400
             )
         else:
