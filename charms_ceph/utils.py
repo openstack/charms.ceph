@@ -637,7 +637,7 @@ def _get_osd_num_from_dirname(dirname):
     :raises ValueError: if the osd number cannot be parsed from the provided
                         directory name.
     """
-    match = re.search('ceph-(?P<osd_id>\d+)', dirname)
+    match = re.search(r'ceph-(?P<osd_id>\d+)', dirname)
     if not match:
         raise ValueError("dirname not in correct format: {}".format(dirname))
 
@@ -706,7 +706,7 @@ def get_version():
     package = "ceph"
     try:
         pkg = cache[package]
-    except:
+    except KeyError:
         # the package is unknown to the current apt cache.
         e = 'Could not determine version of package with no installation ' \
             'candidate: %s' % package
@@ -721,7 +721,7 @@ def get_version():
 
     # x.y match only for 20XX.X
     # and ignore patch level for other packages
-    match = re.match('^(\d+)\.(\d+)', vers)
+    match = re.match(r'^(\d+)\.(\d+)', vers)
 
     if match:
         vers = match.group(0)
@@ -956,11 +956,11 @@ def start_osds(devices):
     rescan_osd_devices()
     if (cmp_pkgrevno('ceph', '0.56.6') >= 0 and
             cmp_pkgrevno('ceph', '14.2.0') < 0):
-            # Use ceph-disk activate for directory based OSD's
-            for dev_or_path in devices:
-                if os.path.exists(dev_or_path) and os.path.isdir(dev_or_path):
-                    subprocess.check_call(
-                        ['ceph-disk', 'activate', dev_or_path])
+        # Use ceph-disk activate for directory based OSD's
+        for dev_or_path in devices:
+            if os.path.exists(dev_or_path) and os.path.isdir(dev_or_path):
+                subprocess.check_call(
+                    ['ceph-disk', 'activate', dev_or_path])
 
 
 def udevadm_settle():
@@ -977,6 +977,7 @@ def rescan_osd_devices():
     subprocess.call(cmd)
 
     udevadm_settle()
+
 
 _client_admin_keyring = '/etc/ceph/ceph.client.admin.keyring'
 
@@ -1001,6 +1002,7 @@ def generate_monitor_secret():
     res = str(subprocess.check_output(cmd).decode('UTF-8'))
 
     return "{}==".format(res.split('=')[1].strip())
+
 
 # OSD caps taken from ceph-create-keys
 _osd_bootstrap_caps = {
@@ -1039,7 +1041,7 @@ def get_osd_bootstrap_key():
         # Attempt to get/create a key using the OSD bootstrap profile first
         key = get_named_key('bootstrap-osd',
                             _osd_bootstrap_caps_profile)
-    except:
+    except Exception:
         # If that fails try with the older style permissions
         key = get_named_key('bootstrap-osd',
                             _osd_bootstrap_caps)
@@ -1062,6 +1064,7 @@ def import_radosgw_key(key):
             '--add-key={}'.format(key)
         ]
         subprocess.check_call(cmd)
+
 
 # OSD caps taken from ceph-create-keys
 _radosgw_caps = {
@@ -1299,7 +1302,7 @@ def bootstrap_monitor_cluster(secret):
                             path,
                             done,
                             init_marker)
-        except:
+        except Exception:
             raise
         finally:
             os.unlink(keyring)
@@ -2788,6 +2791,7 @@ def dirs_need_ownership_update(service):
 
     # All child directories had the expected ownership
     return False
+
 
 # A dict of valid ceph upgrade paths. Mapping is old -> new
 UPGRADE_PATHS = collections.OrderedDict([
