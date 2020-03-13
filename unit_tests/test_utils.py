@@ -505,7 +505,7 @@ class CephTestCase(unittest.TestCase):
         key = utils.parse_key(without_caps)
         self.assertEqual(key, expected)
 
-    def test_list_unmounted_devices(self):
+    def test_unmounted_devices_with_correct_input(self):
         dev1 = MagicMock(spec=TestDevice)
         dev1.__getitem__.return_value = "block"
         dev1.device_node = '/dev/sda'
@@ -521,18 +521,38 @@ class CephTestCase(unittest.TestCase):
         dev5 = MagicMock(spec=TestDevice)
         dev5.__getitem__.return_value = "block"
         dev5.device_node = '/dev/dm-1'
-        devices = [dev1, dev2, dev3, dev4, dev5]
+        input_data = [dev1, dev2, dev3, dev4, dev5]
         with patch(
                 'pyudev.Context.list_devices',
-                return_value=devices):
+                return_value=input_data):
             with patch.object(utils, 'is_device_mounted',
                               return_value=False):
-                devices = utils.unmounted_disks()
-                self.assertEqual(devices, ['/dev/sda', '/dev/sdb', '/dev/sdm'])
+                actual_output = utils.unmounted_disks()
+                self.assertEqual(
+                    actual_output,
+                    ['/dev/sda', '/dev/sdb', '/dev/sdm']
+                )
             with patch.object(utils, 'is_device_mounted',
                               return_value=True):
-                devices = utils.unmounted_disks()
-                self.assertEqual(devices, [])
+                actual_output = utils.unmounted_disks()
+                self.assertEqual(actual_output, [])
+
+    def test_unmounted_devices_doesnt_raise_with_incorrect_input(self):
+        dev1 = MagicMock(spec=TestDevice)
+        dev1.__getitem__.return_value = "block"
+        dev1.device_node = '/dev/sda'
+        dev2 = MagicMock(spec=TestDevice)
+        dev2.__getitem__.return_value = "block"
+        dev2.device_node = None
+        input_data = [dev1, dev2]
+        with patch(
+                'pyudev.Context.list_devices',
+                return_value=input_data):
+            for is_device_mounted in (False, True):
+                with patch.object(utils, 'is_device_mounted',
+                                  return_value=is_device_mounted):
+                    # No assertion, we just want to check that it doesn't raise
+                    utils.unmounted_disks()
 
     @patch.object(utils.subprocess, 'check_output')
     def test_get_partition_list(self, output):

@@ -175,12 +175,16 @@ def unmounted_disks():
     context = pyudev.Context()
     for device in context.list_devices(DEVTYPE='disk'):
         if device['SUBSYSTEM'] == 'block':
+            if device.device_node is None:
+                continue
+
             matched = False
             for block_type in [u'dm-', u'loop', u'ram', u'nbd']:
                 if block_type in device.device_node:
                     matched = True
             if matched:
                 continue
+
             disks.append(device.device_node)
     log("Found disks: {}".format(disks))
     return [disk for disk in disks if not is_device_mounted(disk)]
