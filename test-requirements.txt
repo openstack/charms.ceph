@@ -4,7 +4,7 @@
 coverage>=3.6
 nose
 mock>=1.2
-flake8>=2.2.4,<=2.4.1
+flake8>=2.2.4
 stestr
 requests==2.6.0
 netifaces

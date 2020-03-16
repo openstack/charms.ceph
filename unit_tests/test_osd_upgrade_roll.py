@@ -413,6 +413,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
         check_call.assert_called_with(['chown', '-R', 'ceph:ceph',
                                        '/var/lib/ceph'])
 
+
 """
     @patch.object(charms_ceph.utils, 'log')
     @patch('time.time', lambda *args: previous_node_start_time + 10 * 60 + 1)
