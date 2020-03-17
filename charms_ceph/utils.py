@@ -1112,6 +1112,7 @@ _default_caps = collections.OrderedDict([
 
 admin_caps = collections.OrderedDict([
     ('mds', ['allow *']),
+    ('mgr', ['allow *']),
     ('mon', ['allow *']),
     ('osd', ['allow *'])
 ])
