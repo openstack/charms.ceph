@@ -15,6 +15,7 @@
 import os
 import sys
 import time
+import subprocess
 import unittest
 
 from mock import patch, call, mock_open
@@ -63,6 +64,7 @@ def monitor_key_side_effect(*args):
 
 class UpgradeRollingTestCase(unittest.TestCase):
 
+    @patch.object(ceph.utils, 'get_osd_state')
     @patch.object(ceph.utils, 'determine_packages')
     @patch.object(ceph.utils, 'dirs_need_ownership_update')
     @patch.object(ceph.utils, 'apt_install')
@@ -80,12 +82,13 @@ class UpgradeRollingTestCase(unittest.TestCase):
                                 add_source, apt_update, status_set, log,
                                 service_restart, chownr, apt_install,
                                 dirs_need_ownership_update,
-                                _determine_packages):
+                                _determine_packages, get_osd_state):
         config.side_effect = config_side_effect
         get_version.side_effect = [0.80, 0.94]
         systemd.return_value = False
         local_osds.return_value = [0, 1, 2]
         dirs_need_ownership_update.return_value = False
+        get_osd_state.side_effect = ['active'] * 6
 
         ceph.utils.upgrade_osd('hammer')
         service_restart.assert_called_with('ceph-osd-all')
@@ -98,6 +101,12 @@ class UpgradeRollingTestCase(unittest.TestCase):
                 call('Upgrading to: hammer')
             ]
         )
+        get_osd_state.assert_has_calls([
+            call(0), call(1), call(2),
+            call(0, osd_goal_state='active'),
+            call(1, osd_goal_state='active'),
+            call(2, osd_goal_state='active'),
+        ])
         # Make sure on an Upgrade to Hammer that chownr was NOT called.
         assert not chownr.called
 
@@ -151,6 +160,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
             ]
         )
 
+    @patch.object(ceph.utils, 'get_osd_state')
     @patch.object(ceph.utils, 'determine_packages')
     @patch.object(ceph.utils, 'service_restart')
     @patch.object(ceph.utils, '_upgrade_single_osd')
@@ -175,7 +185,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
                                   dirs_need_ownership_update,
                                   _get_child_dirs, listdir, update_owner,
                                   _upgrade_single_osd, service_restart,
-                                  _determine_packages):
+                                  _determine_packages, get_osd_state):
         config.side_effect = config_side_effect
         get_version.side_effect = [10.2, 12.2]
         systemd.return_value = True
@@ -183,6 +193,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
         listdir.return_value = ['osd', 'mon', 'fs']
         _get_child_dirs.return_value = ['ceph-0', 'ceph-1', 'ceph-2']
         dirs_need_ownership_update.return_value = False
+        get_osd_state.side_effect = ['active'] * 6
 
         ceph.utils.upgrade_osd('luminous')
         service_restart.assert_called_with('ceph-osd.target')
@@ -198,20 +209,33 @@ class UpgradeRollingTestCase(unittest.TestCase):
                 call('Upgrading to: luminous')
             ]
         )
+        get_osd_state.assert_has_calls([
+            call(0), call(1), call(2),
+            call(0, osd_goal_state='active'),
+            call(1, osd_goal_state='active'),
+            call(2, osd_goal_state='active'),
+        ])
 
+    @patch.object(ceph.utils, 'get_osd_state')
     @patch.object(ceph.utils, 'stop_osd')
     @patch.object(ceph.utils, 'disable_osd')
     @patch.object(ceph.utils, 'update_owner')
     @patch.object(ceph.utils, 'enable_osd')
     @patch.object(ceph.utils, 'start_osd')
     def test_upgrade_single_osd(self, start_osd, enable_osd, update_owner,
-                                disable_osd, stop_osd):
+                                disable_osd, stop_osd, get_osd_state):
+        get_osd_state.side_effect = ['active'] * 2
+
         ceph.utils._upgrade_single_osd(1, '/var/lib/ceph/osd/ceph-1')
         stop_osd.assert_called_with(1)
         disable_osd.assert_called_with(1)
         update_owner.assert_called_with('/var/lib/ceph/osd/ceph-1')
         enable_osd.assert_called_with(1)
         start_osd.assert_called_with(1)
+        get_osd_state.assert_has_calls([
+            call(1),
+            call(1, osd_goal_state='active'),
+        ])
 
     @patch.object(ceph.utils, 'systemd')
     @patch.object(ceph.utils, 'service_stop')
@@ -268,6 +292,34 @@ class UpgradeRollingTestCase(unittest.TestCase):
         handle = mo()
         handle.write.assert_called_with('ready')
         update_owner.assert_called_with('/var/lib/ceph/osd/ceph-6/ready')
+
+    @patch('subprocess.check_output')
+    @patch.object(ceph.utils, 'log')
+    def test_get_osd_state(self, log, check_output):
+        check_output.side_effect = [
+            subprocess.CalledProcessError(returncode=2, cmd=["bad"]),
+            ValueError("bad value"),
+            '{"state":"active"}'.encode()] * 2
+
+        osd_state = ceph.utils.get_osd_state(2)
+        check_output.assert_called_with(
+            ['ceph', 'daemon', '/var/run/ceph/ceph-osd.2.asok', 'status'])
+        log.assert_has_calls([
+            call("Command '['bad']' returned non-zero exit status 2.",
+                 level='DEBUG'),
+            call('bad value', level='DEBUG'),
+            call('OSD 2 state: active, goal state: None', level='DEBUG')])
+        self.assertEqual(osd_state, 'active')
+
+        osd_state = ceph.utils.get_osd_state(2, osd_goal_state='active')
+        check_output.assert_called_with(
+            ['ceph', 'daemon', '/var/run/ceph/ceph-osd.2.asok', 'status'])
+        log.assert_has_calls([
+            call("Command '['bad']' returned non-zero exit status 2.",
+                 level='DEBUG'),
+            call('bad value', level='DEBUG'),
+            call('OSD 2 state: active, goal state: None', level='DEBUG')])
+        self.assertEqual(osd_state, 'active')
 
     @patch.object(ceph.utils, 'socket')
     @patch.object(ceph.utils, 'get_osd_tree')
