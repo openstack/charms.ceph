@@ -2631,6 +2631,7 @@ def get_osd_state(osd_num, osd_goal_state=None):
             return osd_state
         if osd_state == osd_goal_state:
             return osd_state
+        time.sleep(3)
 
 
 def get_all_osd_states(osd_goal_states=None):
