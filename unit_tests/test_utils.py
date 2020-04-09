@@ -946,6 +946,7 @@ class CephTestCase(unittest.TestCase):
             'jewel -> luminous',
             'luminous -> mimic',
             'mimic -> nautilus',
+            'nautilus -> octopus',
         ])
         self.assertEqual(utils.pretty_print_upgrade_paths(), expected)
 
