@@ -1102,6 +1102,109 @@ class CephTestCase(unittest.TestCase):
              })
 
 
+class CephApplyOSDSettingsTestCase(unittest.TestCase):
+
+    def setUp(self):
+        super(CephApplyOSDSettingsTestCase, self).setUp()
+        self.base_cmd = 'ceph daemon osd.{osd_id} config --format=json'
+        self.get_cmd = self.base_cmd + ' get {key}'
+        self.set_cmd = self.base_cmd + ' set {key} {value}'
+        self.grace = 'osd_heartbeat_grace'
+        self.interval = 'osd_heartbeat_interval'
+
+    @patch.object(utils, 'get_local_osd_ids')
+    @patch.object(utils.subprocess, 'check_output')
+    def test_apply_osd_settings(self, _check_output, _get_local_osd_ids):
+        _get_local_osd_ids.return_value = ['0']
+        output = {
+            self.get_cmd.format(osd_id=0, key=self.grace):
+                b'{"osd_heartbeat_grace":"19"}',
+            self.set_cmd.format(osd_id=0, key=self.grace, value='21'):
+                b"""{"success":"osd_heartbeat_grace = '21'"}"""}
+        _check_output.side_effect = lambda x: output[' '.join(x)]
+        self.assertTrue(
+            utils.apply_osd_settings({'osd heartbeat grace': '21'}))
+        check_output_calls = [
+            call(['ceph', 'daemon', 'osd.0', 'config', '--format=json', 'get',
+                  'osd_heartbeat_grace']),
+            call(['ceph', 'daemon', 'osd.0', 'config', '--format=json', 'set',
+                  'osd_heartbeat_grace', '21'])]
+        _check_output.assert_has_calls(check_output_calls)
+        self.assertTrue(_check_output.call_count == len(check_output_calls))
+
+    @patch.object(utils, 'get_local_osd_ids')
+    @patch.object(utils.subprocess, 'check_output')
+    def test_apply_osd_settings_noop_on_one_osd(self, _check_output,
+                                                _get_local_osd_ids):
+        _get_local_osd_ids.return_value = ['0', '1']
+        output = {
+            self.get_cmd.format(osd_id=0, key=self.grace):
+                b'{"osd_heartbeat_grace":"21"}',
+            self.get_cmd.format(osd_id=1, key=self.grace):
+                b'{"osd_heartbeat_grace":"20"}',
+            self.set_cmd.format(osd_id=1, key=self.grace, value='21'):
+                b"""{"success":"osd_heartbeat_interval = '2'"}"""}
+        _check_output.side_effect = lambda x: output[' '.join(x)]
+        self.assertTrue(
+            utils.apply_osd_settings({'osd heartbeat grace': '21'}))
+        check_output_calls = [
+            call(['ceph', 'daemon', 'osd.0', 'config', '--format=json', 'get',
+                  'osd_heartbeat_grace']),
+            call(['ceph', 'daemon', 'osd.1', 'config', '--format=json', 'get',
+                  'osd_heartbeat_grace']),
+            call(['ceph', 'daemon', 'osd.1', 'config', '--format=json', 'set',
+                  'osd_heartbeat_grace', '21'])]
+        _check_output.assert_has_calls(check_output_calls)
+        self.assertTrue(_check_output.call_count == len(check_output_calls))
+
+    @patch.object(utils, 'get_local_osd_ids')
+    @patch.object(utils.subprocess, 'check_output')
+    def _test_apply_osd_settings_error(self, _check_output,
+                                       _get_local_osd_ids):
+        _get_local_osd_ids.return_value = ['0']
+        output = {
+            self.get_cmd.format(osd_id=0, key=self.grace):
+                b"""{"error":"error setting 'osd_heartbeat_grace'"}"""}
+        _check_output.side_effect = lambda x: output[' '.join(x)]
+        self.assertFalse(
+            utils.apply_osd_settings({'osd heartbeat grace': '21'}))
+        check_output_calls = [
+            call(['ceph', 'daemon', 'osd.0', 'config', '--format=json', 'get',
+                  'osd_heartbeat_grace'])]
+        _check_output.assert_has_calls(check_output_calls)
+        self.assertTrue(_check_output.call_count == len(check_output_calls))
+
+    @patch.object(utils, 'get_local_osd_ids')
+    @patch.object(utils.subprocess, 'check_output')
+    def test_apply_osd_settings_error(self, _check_output,
+                                      _get_local_osd_ids):
+        _get_local_osd_ids.return_value = ['0', '1']
+        output = {
+            self.get_cmd.format(osd_id=0, key=self.grace):
+                b'{"osd_heartbeat_grace":"19"}',
+            self.get_cmd.format(osd_id=0, key=self.interval):
+                b'{"osd_heartbeat_interval":"3"}',
+            self.set_cmd.format(osd_id=0, key=self.interval, value='2'):
+                b"""{"success":"osd_heartbeat_interval = '2'"}""",
+            self.set_cmd.format(osd_id=0, key=self.grace, value='21'):
+                b"""{"error":"error setting 'osd_heartbeat_grace'"}"""}
+        _check_output.side_effect = lambda x: output[' '.join(x)]
+        check_output_calls = [
+            call(['ceph', 'daemon', 'osd.0', 'config', '--format=json', 'get',
+                  'osd_heartbeat_grace']),
+            call(['ceph', 'daemon', 'osd.0', 'config', '--format=json', 'get',
+                  'osd_heartbeat_interval']),
+            call(['ceph', 'daemon', 'osd.0', 'config', '--format=json', 'set',
+                  'osd_heartbeat_grace', '21'])]
+        with self.assertRaises(utils.OSDConfigSetError):
+            utils.apply_osd_settings({
+                'osd heartbeat grace': '21',
+                'osd heartbeat interval': '2'})
+            _check_output.assert_has_calls(check_output_calls)
+            self.assertTrue(
+                _check_output.call_count == len(check_output_calls))
+
+
 class CephVolumeSizeCalculatorTestCase(unittest.TestCase):
 
     @patch.object(utils, 'get_conf')
