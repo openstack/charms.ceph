@@ -38,3 +38,80 @@ class GeneralUtilsTestCase(unittest.TestCase):
             '--subsystem-match=block',
             '--action=add'])
         _udevadm_settle.assert_called_once_with()
+
+
+class AllocateLVTestCase(unittest.TestCase):
+
+    @patch.object(charms_ceph.utils, 'rescan_osd_devices')
+    @patch.object(charms_ceph.utils, '_initialize_disk')
+    @patch.object(charms_ceph.utils.os.path, 'exists')
+    @patch.object(charms_ceph.utils, 'lvm')
+    def test_allocate_lv_ok(self,
+                            _lvm,
+                            _exists,
+                            _initialize_disk,
+                            _rescan_osd_devices):
+        _exists.return_value = True
+        _lvm.list_logical_volumes.return_value = []
+        _lvm.is_lvm_physical_volume.return_value = False
+        _initialize_disk.side_effect = (
+            lambda dev, dev_uuid, encrypt, key_manager: dev
+        )
+        self.assertEqual(
+            charms_ceph.utils._allocate_logical_volume(
+                dev="/dev/disk/by-dname/foobar",
+                lv_type="block",
+                osd_fsid="abcdef"
+            ),
+            "ceph-abcdef/osd-block-abcdef"
+        )
+        _lvm.create_lvm_physical_volume.assert_called_once_with(
+            "/dev/disk/by-dname/foobar"
+        )
+        _lvm.create_lvm_volume_group.assert_called_once_with(
+            "ceph-abcdef",
+            "/dev/disk/by-dname/foobar"
+        )
+        _lvm.create_logical_volume.assert_called_once_with(
+            "osd-block-abcdef",
+            "ceph-abcdef",
+            None,
+        )
+        _rescan_osd_devices.assert_not_called()
+
+    @patch.object(charms_ceph.utils, 'rescan_osd_devices')
+    @patch.object(charms_ceph.utils, '_initialize_disk')
+    @patch.object(charms_ceph.utils.os.path, 'exists')
+    @patch.object(charms_ceph.utils, 'lvm')
+    def test_allocate_lv_bug1878752(self,
+                                    _lvm,
+                                    _exists,
+                                    _initialize_disk,
+                                    _rescan_osd_devices):
+        _exists.return_value = False
+        _lvm.list_logical_volumes.return_value = []
+        _lvm.is_lvm_physical_volume.return_value = False
+        _initialize_disk.side_effect = (
+            lambda dev, dev_uuid, encrypt, key_manager: dev
+        )
+        self.assertEqual(
+            charms_ceph.utils._allocate_logical_volume(
+                dev="/dev/disk/by-dname/foobar",
+                lv_type="block",
+                osd_fsid="abcdef"
+            ),
+            "ceph-abcdef/osd-block-abcdef"
+        )
+        _lvm.create_lvm_physical_volume.assert_called_once_with(
+            "/dev/disk/by-dname/foobar"
+        )
+        _lvm.create_lvm_volume_group.assert_called_once_with(
+            "ceph-abcdef",
+            "/dev/disk/by-dname/foobar"
+        )
+        _lvm.create_logical_volume.assert_called_once_with(
+            "osd-block-abcdef",
+            "ceph-abcdef",
+            None,
+        )
+        _rescan_osd_devices.assert_called_once_with()
