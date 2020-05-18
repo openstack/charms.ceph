@@ -1141,6 +1141,7 @@ osd_upgrade_caps = collections.OrderedDict([
 rbd_mirror_caps = collections.OrderedDict([
     ('mon', ['profile rbd']),
     ('osd', ['profile rbd']),
+    ('mgr', ['allow r']),
 ])
 
 

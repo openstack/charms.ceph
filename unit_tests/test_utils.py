@@ -975,6 +975,7 @@ class CephTestCase(unittest.TestCase):
             caps=collections.OrderedDict([
                 ('mon', ['profile rbd']),
                 ('osd', ['profile rbd']),
+                ('mgr', ['allow r']),
             ])
         )
 
