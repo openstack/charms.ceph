@@ -973,7 +973,7 @@ class CephTestCase(unittest.TestCase):
         _get_named_key.assert_called_once_with(
             name='someid',
             caps=collections.OrderedDict([
-                ('mon', ['profile rbd']),
+                ('mon', ['profile rbd; allow r']),
                 ('osd', ['profile rbd']),
                 ('mgr', ['allow r']),
             ])
