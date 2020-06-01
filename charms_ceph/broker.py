@@ -155,25 +155,47 @@ def handle_create_erasure_profile(request, service):
     :param service: The ceph client to run the command under.
     :returns: dict. exit-code and reason if not 0
     """
-    # "local" | "shec" or it defaults to "jerasure"
+    # "isa" | "lrc" | "shec" | "clay" or it defaults to "jerasure"
     erasure_type = request.get('erasure-type')
-    # "host" | "rack" or it defaults to "host"  # Any valid Ceph bucket
+    # dependent on erasure coding type
+    erasure_technique = request.get('erasure-technique')
+    # "host" | "rack" | ...
     failure_domain = request.get('failure-domain')
     name = request.get('name')
     # Binary Distribution Matrix (BDM) parameters
     bdm_k = request.get('k')
     bdm_m = request.get('m')
+    # LRC parameters
     bdm_l = request.get('l')
+    crush_locality = request.get('crush-locality')
+    # SHEC parameters
+    bdm_c = request.get('c')
+    # CLAY parameters
+    bdm_d = request.get('d')
+    scalar_mds = request.get('scalar-mds')
+    # Device Class
+    device_class = request.get('device-class')
 
-    if failure_domain not in CEPH_BUCKET_TYPES:
+    if failure_domain and failure_domain not in CEPH_BUCKET_TYPES:
         msg = "failure-domain must be one of {}".format(CEPH_BUCKET_TYPES)
         log(msg, level=ERROR)
         return {'exit-code': 1, 'stderr': msg}
 
-    create_erasure_profile(service=service, erasure_plugin_name=erasure_type,
-                           profile_name=name, failure_domain=failure_domain,
-                           data_chunks=bdm_k, coding_chunks=bdm_m,
-                           locality=bdm_l)
+    create_erasure_profile(service=service,
+                           erasure_plugin_name=erasure_type,
+                           profile_name=name,
+                           failure_domain=failure_domain,
+                           data_chunks=bdm_k,
+                           coding_chunks=bdm_m,
+                           locality=bdm_l,
+                           durability_estimator=bdm_d,
+                           helper_chunks=bdm_c,
+                           scalar_mds=scalar_mds,
+                           crush_locality=crush_locality,
+                           device_class=device_class,
+                           erasure_plugin_technique=erasure_technique)
+
+    return {'exit-code': 0}
 
 
 def handle_add_permissions_to_key(request, service):
@@ -387,6 +409,7 @@ def handle_erasure_pool(request, service):
     max_objects = request.get('max-objects')
     weight = request.get('weight')
     group_name = request.get('group')
+    allow_ec_overwrites = request.get('allow-ec-overwrites')
 
     if erasure_profile is None:
         erasure_profile = "default-canonical"
@@ -416,7 +439,9 @@ def handle_erasure_pool(request, service):
 
     pool = ErasurePool(service=service, name=pool_name,
                        erasure_code_profile=erasure_profile,
-                       percent_data=weight, app_name=app_name)
+                       percent_data=weight,
+                       app_name=app_name,
+                       allow_ec_overwrites=allow_ec_overwrites)
     # Ok make the erasure pool
     if not pool_exists(service=service, name=pool_name):
         log("Creating pool '{}' (erasure_profile={})"
