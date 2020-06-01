@@ -15,7 +15,7 @@
 import json
 import unittest
 
-from unittest.mock import patch
+from unittest.mock import patch, ANY
 
 import charms_ceph.broker
 
@@ -703,3 +703,57 @@ class CephBrokerTestCase(unittest.TestCase):
                 'osd',
                 ('allow rwx pool=glance, '
                  'allow class-read object_prefix rbd_children')])
+
+    @patch.object(charms_ceph.broker, 'create_erasure_profile')
+    def test_handle_create_erasure_profile(self,
+                                           mock_create_erasure_profile):
+        request = {
+            'erasure-type': 'jerasure',
+            'erasure-technique': 'reed_sol',
+            'name': 'newprofile',
+            'failure-domain': 'host',
+            'k': 4,
+            'm': 2,
+            'l': None,
+        }
+        resp = charms_ceph.broker.handle_create_erasure_profile(
+            request,
+            'testservice'
+        )
+        self.assertEqual(resp, {'exit-code': 0})
+
+        mock_create_erasure_profile.assert_called_once_with(
+            service='testservice',
+            erasure_plugin_name='jerasure',
+            profile_name='newprofile',
+            failure_domain='host',
+            data_chunks=4,
+            coding_chunks=2,
+            locality=None,
+            erasure_plugin_technique='reed_sol',
+        )
+
+    @patch.object(charms_ceph.broker, 'create_erasure_profile')
+    def test_handle_create_erasure_profile_bad(self,
+                                               mock_create_erasure_profile):
+        request = {
+            'erasure-type': 'jerasure',
+            'erasure-technique': 'reed_sol',
+            'name': 'newprofile',
+            'failure-domain': 'foobar',
+            'k': 4,
+            'm': 2,
+            'l': None,
+        }
+        resp = charms_ceph.broker.handle_create_erasure_profile(
+            request,
+            'testservice'
+        )
+        self.assertEqual(
+            resp,
+            {
+                'exit-code': 1,
+                'stderr': ANY,
+            }
+        )
+        mock_create_erasure_profile.assert_not_called()

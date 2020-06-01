@@ -157,6 +157,7 @@ def handle_create_erasure_profile(request, service):
     """
     # "local" | "shec" or it defaults to "jerasure"
     erasure_type = request.get('erasure-type')
+    erasure_technique = request.get('erasure-technique')
     # "host" | "rack" or it defaults to "host"  # Any valid Ceph bucket
     failure_domain = request.get('failure-domain')
     name = request.get('name')
@@ -173,7 +174,10 @@ def handle_create_erasure_profile(request, service):
     create_erasure_profile(service=service, erasure_plugin_name=erasure_type,
                            profile_name=name, failure_domain=failure_domain,
                            data_chunks=bdm_k, coding_chunks=bdm_m,
-                           locality=bdm_l)
+                           locality=bdm_l,
+                           erasure_plugin_technique=erasure_technique)
+
+    return {'exit-code': 0}
 
 
 def handle_add_permissions_to_key(request, service):
@@ -387,6 +391,7 @@ def handle_erasure_pool(request, service):
     max_objects = request.get('max-objects')
     weight = request.get('weight')
     group_name = request.get('group')
+    allow_ec_overwrites = request.get('allow-ec-overwrites')
 
     if erasure_profile is None:
         erasure_profile = "default-canonical"
@@ -416,7 +421,9 @@ def handle_erasure_pool(request, service):
 
     pool = ErasurePool(service=service, name=pool_name,
                        erasure_code_profile=erasure_profile,
-                       percent_data=weight, app_name=app_name)
+                       percent_data=weight,
+                       app_name=app_name,
+                       allow_ec_overwrites=allow_ec_overwrites)
     # Ok make the erasure pool
     if not pool_exists(service=service, name=pool_name):
         log("Creating pool '{}' (erasure_profile={})"
