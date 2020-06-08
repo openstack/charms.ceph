@@ -18,7 +18,7 @@ import time
 import subprocess
 import unittest
 
-from mock import patch, call, mock_open
+from unittest.mock import patch, call, mock_open
 
 import charms_ceph.utils
 

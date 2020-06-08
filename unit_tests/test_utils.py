@@ -16,7 +16,7 @@ import collections
 import subprocess
 import unittest
 
-from mock import (
+from unittest.mock import (
     call,
     mock_open,
     MagicMock,

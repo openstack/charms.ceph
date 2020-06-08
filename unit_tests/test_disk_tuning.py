@@ -14,7 +14,7 @@
 
 import unittest
 
-from mock import patch
+from unittest.mock import patch
 
 import charms_ceph.utils
 
