@@ -41,6 +41,7 @@ from charmhelpers.core.host import (
     service_stop,
     CompareHostReleases,
     write_file,
+    is_container,
 )
 from charmhelpers.core.hookenv import (
     cached,
@@ -54,8 +55,12 @@ from charmhelpers.core.hookenv import (
     storage_list,
 )
 from charmhelpers.fetch import (
+    add_source,
     apt_cache,
-    add_source, apt_install, apt_update
+    apt_install,
+    apt_purge,
+    apt_update,
+    filter_missing_packages
 )
 from charmhelpers.contrib.storage.linux.ceph import (
     get_mon_map,
@@ -84,6 +89,9 @@ QUORUM = [LEADER, PEON]
 PACKAGES = ['ceph', 'gdisk',
             'radosgw', 'xfsprogs',
             'lvm2', 'parted', 'smartmontools']
+
+REMOVE_PACKAGES = []
+CHRONY_PACKAGE = 'chrony'
 
 CEPH_KEY_MANAGER = 'ceph'
 VAULT_KEY_MANAGER = 'vault'
@@ -2209,6 +2217,9 @@ def upgrade_monitor(new_version, kick_function=None):
         else:
             service_stop('ceph-mon-all')
         apt_install(packages=determine_packages(), fatal=True)
+        rm_packages = determine_packages_to_remove()
+        if rm_packages:
+            apt_purge(packages=rm_packages, fatal=True)
         kick_function()
 
         owner = ceph_user()
@@ -3250,6 +3261,19 @@ def determine_packages():
         btrfs_package = 'btrfs-tools'
     packages.append(btrfs_package)
     return packages
+
+
+def determine_packages_to_remove():
+    """Determines packages for removal
+
+    :returns: list of packages to be removed
+    """
+    rm_packages = REMOVE_PACKAGES.copy()
+    if is_container():
+        install_list = filter_missing_packages(CHRONY_PACKAGE)
+        if not install_list:
+            rm_packages.append(CHRONY_PACKAGE)
+    return rm_packages
 
 
 def bootstrap_manager():
