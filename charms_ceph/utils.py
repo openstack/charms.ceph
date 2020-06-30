@@ -623,7 +623,7 @@ def _get_child_dirs(path):
              OSError if an error occurs reading the directory listing
     """
     if not os.path.exists(path):
-        raise ValueError('Specfied path "%s" does not exist' % path)
+        raise ValueError('Specified path "%s" does not exist' % path)
     if not os.path.isdir(path):
         raise ValueError('Specified path "%s" is not a directory' % path)
 
@@ -3088,7 +3088,7 @@ def apply_osd_settings(settings):
     present. Settings stop being applied on encountering an error.
 
     :param settings: dict. Dictionary of settings to apply.
-    :returns: bool. True if commands ran succesfully.
+    :returns: bool. True if commands ran successfully.
     :raises: OSDConfigSetError
     """
     current_settings = {}
