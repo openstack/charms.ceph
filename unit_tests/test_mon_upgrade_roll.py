@@ -16,7 +16,7 @@ import sys
 import time
 import unittest
 
-from unittest.mock import patch, call, MagicMock
+from unittest.mock import patch, call, MagicMock, ANY
 
 import charms_ceph.utils
 
@@ -52,6 +52,14 @@ def monitor_key_side_effect(*args):
         return str(previous_node_start_time)
 
 
+def monitor_key_exists_side_effect(*args):
+    if args[1] == 'mon_ip-192-168-1-2_0.94.1_start':
+        return True
+    if args[1] == 'mon_ip-192-168-1-2_0.94.1_done':
+        return False
+    raise Exception("Unexpected test argument")
+
+
 class UpgradeRollingTestCase(unittest.TestCase):
 
     @patch('time.time')
@@ -65,7 +73,8 @@ class UpgradeRollingTestCase(unittest.TestCase):
                                         version='hammer',
                                         service='mon',
                                         upgrade_key='admin')
-        upgrade_monitor.assert_called_once_with('hammer')
+        upgrade_monitor.assert_called_once_with('hammer',
+                                                kick_function=ANY)
         log.assert_has_calls(
             [
                 call('monitor_key_set '
@@ -108,10 +117,14 @@ class UpgradeRollingTestCase(unittest.TestCase):
         local_mons.return_value = ['a']
         mock_cmp_pkgrevno.return_value = -1
 
-        charms_ceph.utils.upgrade_monitor('hammer')
+        mock_kick_function = MagicMock()
+
+        charms_ceph.utils.upgrade_monitor('hammer',
+                                          kick_function=mock_kick_function)
         service_stop.assert_called_with('ceph-mon-all')
         service_start.assert_called_with('ceph-mon-all')
         add_source.assert_called_with('cloud:trusty-kilo', 'key')
+        mock_kick_function.assert_called()
 
         log.assert_has_calls(
             [
@@ -317,7 +330,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
 
         mock_time.time.side_effect = fake_time
         monitor_key_get.side_effect = monitor_key_side_effect
-        monitor_key_exists.return_value = False
+        monitor_key_exists.side_effect = monitor_key_exists_side_effect
 
         charms_ceph.utils.wait_on_previous_node(
             previous_node="ip-192-168-1-2",
@@ -325,18 +338,22 @@ class UpgradeRollingTestCase(unittest.TestCase):
             service='mon',
             upgrade_key='admin'
         )
+        # Make sure the function tested that start exists.
+        monitor_key_exists.assert_any_call('admin',
+                                           'mon_ip-192-168-1-2_0.94.1_start')
+        # Make sure the Watchdog checked at least once for alive.
+        monitor_key_get.assert_any_call('admin',
+                                        'mon_ip-192-168-1-2_0.94.1_alive')
 
-        # Make sure we checked to see if the previous node started
-        monitor_key_get.assert_has_calls(
-            [call('admin', 'mon_ip-192-168-1-2_0.94.1_start')]
-        )
         # Make sure we checked to see if the previous node was finished
         monitor_key_exists.assert_has_calls(
             [call('admin', 'mon_ip-192-168-1-2_0.94.1_done')]
         )
+
         # Make sure we waited at last once before proceeding
         log.assert_has_calls(
             [call('Previous node is: ip-192-168-1-2')],
             [call('ip-192-168-1-2 is not finished. Waiting')],
         )
+
         self.assertGreaterEqual(tval[0], previous_node_start_time + 600)
