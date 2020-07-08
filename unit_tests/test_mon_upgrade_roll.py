@@ -76,6 +76,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
                      'mon_ip-192-168-1-2_hammer_done 1473279502.69'),
             ])
 
+    @patch.object(charms_ceph.utils, 'cmp_pkgrevno')
     @patch.object(charms_ceph.utils, 'determine_packages')
     @patch.object(charms_ceph.utils, 'ceph_user')
     @patch.object(charms_ceph.utils, 'socket')
@@ -97,13 +98,15 @@ class UpgradeRollingTestCase(unittest.TestCase):
                                     apt_update, status_set, log,
                                     service_start, service_stop, chownr,
                                     apt_install, mkdir, socket,
-                                    ceph_user, _determine_packages):
+                                    ceph_user, _determine_packages,
+                                    mock_cmp_pkgrevno):
         get_version.side_effect = [0.80, 0.94]
         config.side_effect = config_side_effect
         systemd.return_value = False
         socket.gethostname.return_value = 'testmon'
         ceph_user.return_value = 'root'
         local_mons.return_value = ['a']
+        mock_cmp_pkgrevno.return_value = -1
 
         charms_ceph.utils.upgrade_monitor('hammer')
         service_stop.assert_called_with('ceph-mon-all')
@@ -125,6 +128,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
                                  perms=0o755)
         chownr.assert_not_called()
 
+    @patch.object(charms_ceph.utils, 'cmp_pkgrevno')
     @patch.object(charms_ceph.utils, 'determine_packages')
     @patch.object(charms_ceph.utils, 'ceph_user')
     @patch.object(charms_ceph.utils, 'socket')
@@ -146,13 +150,15 @@ class UpgradeRollingTestCase(unittest.TestCase):
                                    apt_update, status_set, log,
                                    service_start, service_stop, chownr,
                                    apt_install, mkdir, socket,
-                                   ceph_user, _determine_packages):
+                                   ceph_user, _determine_packages,
+                                   mock_cmp_pkgrevno):
         get_version.side_effect = [0.94, 10.1]
         config.side_effect = config_side_effect
         systemd.return_value = False
         socket.gethostname.return_value = 'testmon'
         ceph_user.return_value = 'ceph'
         local_mons.return_value = ['a']
+        mock_cmp_pkgrevno.return_value = -1
 
         charms_ceph.utils.upgrade_monitor('jewel')
         service_stop.assert_called_with('ceph-mon-all')
@@ -179,6 +185,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
                                  group='ceph',
                                  perms=0o755)
 
+    @patch.object(charms_ceph.utils, 'cmp_pkgrevno')
     @patch.object(charms_ceph.utils, 'determine_packages')
     @patch.object(charms_ceph.utils, 'ceph_user')
     @patch.object(charms_ceph.utils, 'socket')
@@ -187,6 +194,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
     @patch.object(charms_ceph.utils, 'chownr')
     @patch.object(charms_ceph.utils, 'service_stop')
     @patch.object(charms_ceph.utils, 'service_start')
+    @patch.object(charms_ceph.utils, 'service_restart')
     @patch.object(charms_ceph.utils, 'log')
     @patch.object(charms_ceph.utils, 'status_set')
     @patch.object(charms_ceph.utils, 'apt_update')
@@ -197,18 +205,23 @@ class UpgradeRollingTestCase(unittest.TestCase):
     def test_upgrade_monitor_luminous(self, config, get_version,
                                       systemd, add_source,
                                       apt_update, status_set, log,
+                                      service_restart,
                                       service_start, service_stop, chownr,
                                       apt_install, mkdir, socket,
-                                      ceph_user, _determine_packages):
+                                      ceph_user, _determine_packages,
+                                      mock_cmp_pkgrevno):
         get_version.side_effect = [10.2, 12.2]
         config.side_effect = config_side_effect
         socket.gethostname.return_value = 'testmon'
         ceph_user.return_value = 'ceph'
         systemd.return_value = True
+        mock_cmp_pkgrevno.return_value = 0   # it is luminous
 
         charms_ceph.utils.upgrade_monitor('luminous')
-        service_stop.assert_called_with('ceph-mon')
-        service_start.assert_called_with('ceph-mon')
+        service_stop.assert_any_call('ceph-mon')
+        service_stop.assert_any_call('ceph-mgr.target')
+        service_restart.assert_any_call('ceph-mon')
+        service_restart.assert_any_call('ceph-mgr.target')
         add_source.assert_called_with('cloud:trusty-kilo', 'key')
 
         log.assert_has_calls(
