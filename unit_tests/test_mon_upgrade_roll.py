@@ -16,7 +16,7 @@ import sys
 import time
 import unittest
 
-from mock import patch, call, MagicMock
+from unittest.mock import patch, call, MagicMock
 
 import charms_ceph.utils
 

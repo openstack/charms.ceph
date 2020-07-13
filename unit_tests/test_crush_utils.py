@@ -16,7 +16,7 @@ import unittest
 
 import charms_ceph.crush_utils
 
-from mock import patch
+from unittest.mock import patch
 
 
 CRUSHMAP1 = """# begin crush map
