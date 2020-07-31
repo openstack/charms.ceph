@@ -682,9 +682,10 @@ class CephTestCase(unittest.TestCase):
         mock_reweight.assert_called_once_with(
             ['ceph', 'osd', 'crush', 'reweight', 'osd.0', '1'], stderr=-2)
 
-    @patch.object(utils, 'lsb_release')
-    def test_determine_packages(self, _lsb_release):
-        _lsb_release.return_value = {'DISTRIB_CODENAME': 'bionic'}
+    @patch.object(utils, 'CompareHostReleases')
+    def test_determine_packages(self, _cmp):
+        _cmp().__str__.return_value = 'bionic'
+        _cmp().__ge__.return_value = False
         self.assertEqual(utils.PACKAGES + ['btrfs-tools'],
                          utils.determine_packages())
 
@@ -2010,8 +2011,9 @@ class CephGetLVSTestCase(unittest.TestCase):
         _log.assert_called_with(oserror_exception)
         self.assertEqual(result, False)
 
+    @patch.object(utils, 'WARNING')
     @patch.object(utils, 'log')
-    def test_is_pristine_disk_short_read(self, _log):
+    def test_is_pristine_disk_short_read(self, _log, _level_WRN):
         data = b'\0' * 2047
         fake_open = mock_open(read_data=data)
         with patch('charms_ceph.utils.open', fake_open):
@@ -2019,7 +2021,7 @@ class CephGetLVSTestCase(unittest.TestCase):
         fake_open.assert_called_with('/dev/vdz', 'rb')
         _log.assert_called_with(
             '/dev/vdz: short read, got 2047 bytes expected 2048.',
-            level='WARNING')
+            level=_level_WRN)
         self.assertEqual(result, False)
 
     def test_is_pristine_disk_dirty_disk(self):

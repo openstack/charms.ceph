@@ -293,9 +293,10 @@ class UpgradeRollingTestCase(unittest.TestCase):
         handle.write.assert_called_with('ready')
         update_owner.assert_called_with('/var/lib/ceph/osd/ceph-6/ready')
 
+    @patch.object(charms_ceph.utils, 'DEBUG')
     @patch('subprocess.check_output')
     @patch.object(charms_ceph.utils, 'log')
-    def test_get_osd_state(self, log, check_output):
+    def test_get_osd_state(self, log, check_output, level_DBG):
         check_output.side_effect = [
             subprocess.CalledProcessError(returncode=2, cmd=["bad"]),
             ValueError("bad value"),
@@ -306,9 +307,9 @@ class UpgradeRollingTestCase(unittest.TestCase):
             ['ceph', 'daemon', '/var/run/ceph/ceph-osd.2.asok', 'status'])
         log.assert_has_calls([
             call("Command '['bad']' returned non-zero exit status 2.",
-                 level='DEBUG'),
-            call('bad value', level='DEBUG'),
-            call('OSD 2 state: active, goal state: None', level='DEBUG')])
+                 level=level_DBG),
+            call('bad value', level=level_DBG),
+            call('OSD 2 state: active, goal state: None', level=level_DBG)])
         self.assertEqual(osd_state, 'active')
 
         osd_state = charms_ceph.utils.get_osd_state(2, osd_goal_state='active')
@@ -316,9 +317,9 @@ class UpgradeRollingTestCase(unittest.TestCase):
             ['ceph', 'daemon', '/var/run/ceph/ceph-osd.2.asok', 'status'])
         log.assert_has_calls([
             call("Command '['bad']' returned non-zero exit status 2.",
-                 level='DEBUG'),
-            call('bad value', level='DEBUG'),
-            call('OSD 2 state: active, goal state: None', level='DEBUG')])
+                 level=level_DBG),
+            call('bad value', level=level_DBG),
+            call('OSD 2 state: active, goal state: None', level=level_DBG)])
         self.assertEqual(osd_state, 'active')
 
     @patch.object(charms_ceph.utils, 'socket')

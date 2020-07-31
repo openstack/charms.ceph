@@ -335,16 +335,17 @@ class CephBrokerTestCase(unittest.TestCase):
                                                    mock_get_osds):
         mock_pool_exists.return_value = False
         mock_get_osds.return_value = [0, 1, 2]
+        op = {
+            'op': 'create-pool',
+            'name': 'foo',
+            'replicas': 3,
+            'pg_num': 100,
+        }
         reqs = json.dumps({'api-version': 1,
-                           'ops': [{
-                               'op': 'create-pool',
-                               'name': 'foo',
-                               'replicas': 3,
-                               'pg_num': 100}]})
+                           'ops': [op]})
         rc = charms_ceph.broker.process_requests(reqs)
+        mock_replicated_pool.assert_called_with(service='admin', op=op)
         mock_pool_exists.assert_called_with(service='admin', name='foo')
-        mock_replicated_pool.assert_called_with(service='admin', name='foo',
-                                                replicas=3, pg_num=100)
         self.assertEqual(json.loads(rc), {'exit-code': 0})
 
     @patch.object(charms_ceph.broker, 'ReplicatedPool')
@@ -355,19 +356,20 @@ class CephBrokerTestCase(unittest.TestCase):
                                                   mock_log, mock_pool_exists,
                                                   mock_replicated_pool):
         mock_pool_exists.return_value = False
+        op = {
+            'op': 'create-pool',
+            'name': 'foo',
+            'replicas': 3,
+            'group': 'image',
+        }
         reqs = json.dumps({'api-version': 1,
-                           'ops': [{
-                               'op': 'create-pool',
-                               'name': 'foo',
-                               'replicas': 3,
-                               'group': 'image'}]})
+                           'ops': [op]})
         rc = charms_ceph.broker.process_requests(reqs)
         add_pool_to_group.assert_called_with(group='image',
                                              pool='foo',
                                              namespace=None)
         mock_pool_exists.assert_called_with(service='admin', name='foo')
-        mock_replicated_pool.assert_called_with(service='admin', name='foo',
-                                                replicas=3)
+        mock_replicated_pool.assert_called_with(service='admin', op=op)
         self.assertEqual(json.loads(rc), {'exit-code': 0})
 
     @patch.object(charms_ceph.broker, 'ReplicatedPool')
@@ -377,10 +379,14 @@ class CephBrokerTestCase(unittest.TestCase):
                                                  mock_pool_exists,
                                                  mock_replicated_pool):
         mock_pool_exists.return_value = True
+
+        op = {
+            'op': 'create-pool',
+            'name': 'foo',
+            'replicas': 3,
+        }
         reqs = json.dumps({'api-version': 1,
-                           'ops': [{'op': 'create-pool',
-                                    'name': 'foo',
-                                    'replicas': 3}]})
+                           'ops': [op]})
         rc = charms_ceph.broker.process_requests(reqs)
         mock_pool_exists.assert_called_with(service='admin',
                                             name='foo')
@@ -394,19 +400,65 @@ class CephBrokerTestCase(unittest.TestCase):
                                               mock_pool_exists,
                                               mock_replicated_pool):
         mock_pool_exists.return_value = False
+        op = {
+            'op': 'create-pool',
+            'name': 'foo',
+            'replicas': 3,
+        }
         reqs = json.dumps({'api-version': 1,
                            'request-id': '1ef5aede',
-                           'ops': [{
-                               'op': 'create-pool',
-                               'name': 'foo',
-                               'replicas': 3}]})
+                           'ops': [op]})
         rc = charms_ceph.broker.process_requests(reqs)
+        mock_replicated_pool.assert_called_with(service='admin', op=op)
         mock_pool_exists.assert_called_with(service='admin', name='foo')
-        mock_replicated_pool.assert_called_with(service='admin',
-                                                name='foo',
-                                                replicas=3)
         self.assertEqual(json.loads(rc)['exit-code'], 0)
         self.assertEqual(json.loads(rc)['request-id'], '1ef5aede')
+
+    @patch.object(charms_ceph.broker, 'erasure_profile_exists')
+    @patch.object(charms_ceph.broker, 'ErasurePool')
+    @patch.object(charms_ceph.broker, 'pool_exists')
+    @patch.object(charms_ceph.broker, 'log')
+    def test_process_requests_create_erasure_pool(self, mock_log,
+                                                  mock_pool_exists,
+                                                  mock_erasure_pool,
+                                                  mock_profile_exists):
+        mock_pool_exists.return_value = False
+        op = {
+            'op': 'create-pool',
+            'pool-type': 'erasure',
+            'name': 'foo',
+            'erasure-profile': 'default'
+        }
+        reqs = json.dumps({'api-version': 1,
+                           'ops': [op]})
+        rc = charms_ceph.broker.process_requests(reqs)
+        mock_profile_exists.assert_called_with(service='admin', name='default')
+        mock_erasure_pool.assert_called_with(service='admin', op=op)
+        mock_pool_exists.assert_called_with(service='admin', name='foo')
+        self.assertEqual(json.loads(rc), {'exit-code': 0})
+
+    @patch.object(charms_ceph.broker, 'pool_exists')
+    @patch.object(charms_ceph.broker, 'BasePool')
+    @patch.object(charms_ceph.broker, 'log', lambda *args, **kwargs: None)
+    def test_process_requests_create_cache_tier(self, mock_pool,
+                                                mock_pool_exists):
+        mock_pool_exists.return_value = True
+        op = {
+            'op': 'create-cache-tier',
+            'cold-pool': 'foo',
+            'hot-pool': 'foo-ssd',
+            'mode': 'writeback',
+            'erasure-profile': 'default'
+        }
+        reqs = json.dumps({'api-version': 1,
+                           'ops': [op]})
+        rc = charms_ceph.broker.process_requests(reqs)
+        mock_pool_exists.assert_any_call(service='admin', name='foo')
+        mock_pool_exists.assert_any_call(service='admin', name='foo-ssd')
+
+        mock_pool().add_cache_tier.assert_called_with(
+            cache_pool='foo-ssd', mode='writeback')
+        self.assertEqual(json.loads(rc), {'exit-code': 0})
 
     @patch.object(charms_ceph.broker, 'get_cephfs')
     @patch.object(charms_ceph.broker, 'check_output')

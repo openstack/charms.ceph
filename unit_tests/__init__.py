@@ -15,3 +15,12 @@
 import sys
 
 sys.path.append('charms_ceph')
+
+# Mock out charmhelpers so that we can test without it.
+import charms_openstack.test_mocks  # noqa
+charms_openstack.test_mocks.mock_charmhelpers()
+
+charmhelpers = charms_openstack.test_mocks.charmhelpers
+
+sys.modules['charmhelpers.contrib.storage.linux.utils'] = (
+    charmhelpers.contrib.storage.linux.utils)
