@@ -494,6 +494,43 @@ class CephBrokerTestCase(unittest.TestCase):
         self.assertEqual(json.loads(rc)['exit-code'], 0)
         self.assertEqual(json.loads(rc)['request-id'], '1ef5aede')
 
+    @patch.object(charms_ceph.broker, 'get_cephfs')
+    @patch.object(charms_ceph.broker, 'check_output')
+    @patch.object(charms_ceph.broker, 'pool_exists')
+    @patch.object(charms_ceph.broker, 'log')
+    def test_process_requests_create_cephfs_ec(self,
+                                               mock_log,
+                                               mock_pool_exists,
+                                               check_output,
+                                               get_cephfs):
+        get_cephfs.return_value = []
+        mock_pool_exists.return_value = True
+        reqs = json.dumps({'api-version': 1,
+                           'request-id': '1ef5aede',
+                           'ops': [{
+                               'op': 'create-cephfs',
+                               'mds_name': 'foo',
+                               'extra_pools': ['ec_pool'],
+                               'data_pool': 'data',
+                               'metadata_pool': 'metadata',
+                           }]})
+        rc = charms_ceph.broker.process_requests(reqs)
+        mock_pool_exists.assert_has_calls(
+            [
+                call(service='admin', name='data'),
+                call(service='admin', name='ec_pool'),
+                call(service='admin', name='metadata'),
+            ],
+            any_order=True)
+        check_output.assert_has_calls(
+            [
+                call(['ceph', '--id', 'admin', 'fs', 'new', 'foo', 'metadata',
+                      'data']),
+                call(['ceph', '--id', 'admin', 'fs', 'add_data_pool', 'foo',
+                      'ec_pool'])])
+        self.assertEqual(json.loads(rc)['exit-code'], 0)
+        self.assertEqual(json.loads(rc)['request-id'], '1ef5aede')
+
     @patch.object(charms_ceph.broker, 'check_output')
     @patch.object(charms_ceph.broker, 'get_osd_weight')
     @patch.object(charms_ceph.broker, 'log')
