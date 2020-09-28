@@ -478,6 +478,7 @@ class CephBrokerTestCase(unittest.TestCase):
                                'mds_name': 'foo',
                                'data_pool': 'data',
                                'metadata_pool': 'metadata',
+                               'extra_pools': None,
                            }]})
         rc = charms_ceph.broker.process_requests(reqs)
         mock_pool_exists.assert_has_calls(
