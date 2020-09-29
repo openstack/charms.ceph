@@ -252,6 +252,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
                                  group='ceph',
                                  perms=0o755)
 
+    @patch.object(charms_ceph.utils, 'upgrade_monitor')
     @patch.object(charms_ceph.utils, 'bootstrap_manager')
     @patch.object(charms_ceph.utils, 'wait_for_all_monitors_to_upgrade')
     @patch.object(charms_ceph.utils, 'status_set')
@@ -267,6 +268,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
                                    status_set,
                                    wait_for_all_monitors_to_upgrade,
                                    bootstrap_manager,
+                                   upgrade_monitor,
                                    new_version):
         socket.gethostname.return_value = "ip-192-168-1-3"
         get_mon_map.return_value = {
@@ -306,6 +308,9 @@ class UpgradeRollingTestCase(unittest.TestCase):
         else:
             wait_for_all_monitors_to_upgrade.assert_not_called()
             bootstrap_manager.assert_not_called()
+
+        upgrade_monitor.assert_has_calls([
+            call(new_version, restart_daemons=False)])
 
     def test_roll_monitor_cluster_luminous(self):
         self._test_roll_monitor_cluster(new_version='luminous')
