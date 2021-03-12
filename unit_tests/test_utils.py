@@ -315,6 +315,38 @@ class CephTestCase(unittest.TestCase):
         weight = utils.get_osd_weight('osd.0')
         self.assertEqual(weight, 0.002899)
 
+    def test_flatten_roots(self):
+        nodes = [
+            {"id": -6, "name": "default", "type": "root", "children": [-5]},
+            {"id": -5, "name": "custom", "type": "row", "children": [-3, -4]},
+            {"id": -4, "name": "az.0", "type": "rack", "children": [-2]},
+            {"id": -2, "name": "test-host.0", "type": "host", "children": [0]},
+            {"id": 0, "name": "osd.0", "type": "osd"},
+            {"id": -3, "name": "az.1", "type": "rack", "children": [-1]},
+            {"id": -1, "name": "test-host.1", "type": "host", "children": [1]},
+            {"id": 1, "name": "osd.1", "type": "osd"},
+        ]
+
+        host_nodes = utils._flatten_roots(nodes)
+        self.assertEqual(len(host_nodes), 2)
+        self.assertEqual(host_nodes[0]["identifier"], -1)
+        self.assertEqual(host_nodes[0]["rack"], "az.1")
+        self.assertEqual(host_nodes[0]["row"], "custom")
+        self.assertEqual(host_nodes[0]["root"], "default")
+        self.assertEqual(host_nodes[1]["identifier"], -2)
+        self.assertEqual(host_nodes[1]["rack"], "az.0")
+        self.assertEqual(host_nodes[1]["row"], "custom")
+        self.assertEqual(host_nodes[1]["root"], "default")
+
+        rack_nodes = utils._flatten_roots(nodes, "rack")
+        self.assertEqual(len(rack_nodes), 2)
+        self.assertEqual(rack_nodes[0]["identifier"], -3)
+        self.assertEqual(rack_nodes[0]["row"], "custom")
+        self.assertEqual(rack_nodes[0]["root"], "default")
+        self.assertEqual(rack_nodes[1]["identifier"], -4)
+        self.assertEqual(rack_nodes[1]["row"], "custom")
+        self.assertEqual(rack_nodes[1]["root"], "default")
+
     @patch.object(utils.subprocess, 'check_output')
     def test_get_osd_tree_multi_root(self, mock_check_output):
         mock_check_output.return_value = b"""{
@@ -394,8 +426,13 @@ class CephTestCase(unittest.TestCase):
     ],"stray":[]}
 """
         osd_tree = utils.get_osd_tree('test')
-        self.assertEqual(osd_tree[0].name, "OS-CS-10")
-        self.assertEqual(osd_tree[-1].name, "OS-CS-06")
+        self.assertEqual(len(osd_tree), 10)
+        self.assertEqual(osd_tree[0].identifier, -11)
+        self.assertEqual(osd_tree[0].name, "OS-CS-08")
+        self.assertEqual(osd_tree[-1].identifier, -2)
+        self.assertEqual(osd_tree[-1].name, "OS-CS-05")
+        self.assertEqual(osd_tree[0].root, "ssds")
+        self.assertEqual(osd_tree[-1].root, "default")
 
     @patch.object(utils.subprocess, 'check_output')
     def test_get_osd_tree_multi_root_with_hierarchy(self, mock_check_output):
@@ -434,9 +471,15 @@ class CephTestCase(unittest.TestCase):
         {"id":23,"name":"osd.23","type":"osd","type_id":0,"crush_weight":1.429993,"depth":3,"pool_weights":{},"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000}],
     "stray":[]}'''
         osd_tree = utils.get_osd_tree('test')
-        self.assertTrue(len(osd_tree) == 4)
-        self.assertEqual(osd_tree[0].name, "uat-l-stor-11")
-        self.assertEqual(osd_tree[-1].name, "uat-l-stor-14")
+        self.assertEqual(len(osd_tree), 4)
+        self.assertEqual(osd_tree[0].identifier, -7)
+        self.assertEqual(osd_tree[0].name, "uat-l-stor-14")
+        self.assertEqual(osd_tree[-1].identifier, -4)
+        self.assertEqual(osd_tree[-1].name, "uat-l-stor-11")
+        self.assertEqual(osd_tree[0].root, "default")
+        self.assertEqual(osd_tree[-1].root, "default")
+        self.assertEqual(osd_tree[0].rack, "ssd")
+        self.assertEqual(osd_tree[-1].rack, "sata")
 
     @patch.object(utils.subprocess, 'check_output')
     def test_get_osd_tree_single_root(self, mock_check_output):
@@ -451,8 +494,10 @@ class CephTestCase(unittest.TestCase):
         {"id":2,"name":"osd.2","type":"osd","type_id":0,"crush_weight":0.000092,"depth":2,"exists":1,"status":"up","reweight":1.000000,"primary_affinity":1.000000}],
     "stray":[]}"""
         osd_tree = utils.get_osd_tree('test')
-        self.assertEqual(osd_tree[0].name, "juju-9d5cf0-icey-4")
-        self.assertEqual(osd_tree[-1].name, "juju-9d5cf0-icey-5")
+        self.assertEqual(osd_tree[0].name, "juju-9d5cf0-icey-5")
+        self.assertEqual(osd_tree[-1].name, "juju-9d5cf0-icey-4")
+        self.assertEqual(osd_tree[0].root, "default")
+        self.assertEqual(osd_tree[-1].root, "default")
 
     @patch.object(utils.subprocess, 'check_output')
     @patch.object(utils, "ceph_user", lambda: "ceph")

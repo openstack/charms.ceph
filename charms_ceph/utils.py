@@ -14,6 +14,7 @@
 
 import collections
 import glob
+import itertools
 import json
 import os
 import pyudev
@@ -502,30 +503,33 @@ def ceph_user():
 
 
 class CrushLocation(object):
-    def __init__(self,
-                 name,
-                 identifier,
-                 host,
-                 rack,
-                 row,
-                 datacenter,
-                 chassis,
-                 root):
-        self.name = name
+    def __init__(self, identifier, name, osd="", host="", chassis="",
+                 rack="", row="", pdu="", pod="", room="",
+                 datacenter="", zone="", region="", root=""):
         self.identifier = identifier
+        self.name = name
+        self.osd = osd
         self.host = host
+        self.chassis = chassis
         self.rack = rack
         self.row = row
+        self.pdu = pdu
+        self.pod = pod
+        self.room = room
         self.datacenter = datacenter
-        self.chassis = chassis
+        self.zone = zone
+        self.region = region
         self.root = root
 
     def __str__(self):
-        return "name: {} id: {} host: {} rack: {} row: {} datacenter: {} " \
-               "chassis :{} root: {}".format(self.name, self.identifier,
-                                             self.host, self.rack, self.row,
-                                             self.datacenter, self.chassis,
-                                             self.root)
+        return "name: {} id: {} osd: {} host: {} chassis: {} rack: {} " \
+               "row: {} pdu: {} pod: {} room: {} datacenter: {} zone: {} " \
+               "region: {} root: {}".format(self.name, self.identifier,
+                                            self.osd, self.host, self.chassis,
+                                            self.rack, self.row, self.pdu,
+                                            self.pod, self.room,
+                                            self.datacenter, self.zone,
+                                            self.region, self.root)
 
     def __eq__(self, other):
         return not self.name < other.name and not other.name < self.name
@@ -572,10 +576,53 @@ def get_osd_weight(osd_id):
         raise
 
 
+def _filter_nodes_and_set_attributes(node, node_lookup_map, lookup_type):
+    """Get all nodes of the desired type, with all their attributes.
+
+    These attributes can be direct or inherited from ancestors.
+    """
+    attribute_dict = {node['type']: node['name']}
+    if node['type'] == lookup_type:
+        attribute_dict['name'] = node['name']
+        attribute_dict['identifier'] = node['id']
+        return [attribute_dict]
+    elif not node.get('children'):
+        return [attribute_dict]
+    else:
+        descendant_attribute_dicts = [
+            _filter_nodes_and_set_attributes(node_lookup_map[node_id],
+                                             node_lookup_map, lookup_type)
+            for node_id in node.get('children', [])
+        ]
+        return [dict(attribute_dict, **descendant_attribute_dict)
+                for descendant_attribute_dict
+                in itertools.chain.from_iterable(descendant_attribute_dicts)]
+
+
+def _flatten_roots(nodes, lookup_type='host'):
+    """Get a flattened list of nodes of the desired type.
+
+    :param nodes: list of nodes defined as a dictionary of attributes and
+                  children
+    :type nodes: List[Dict[int, Any]]
+    :param lookup_type: type of searched node
+    :type lookup_type: str
+    :returns: flattened list of nodes
+    :rtype: List[Dict[str, Any]]
+    """
+    lookup_map = {node['id']: node for node in nodes}
+    root_attributes_dicts = [_filter_nodes_and_set_attributes(node, lookup_map,
+                                                              lookup_type)
+                             for node in nodes if node['type'] == 'root']
+    # get a flattened list of roots.
+    return list(itertools.chain.from_iterable(root_attributes_dicts))
+
+
 def get_osd_tree(service):
     """Returns the current osd map in JSON.
 
     :returns: List.
+    :rtype: List[CrushLocation]
     :raises: ValueError if the monmap fails to parse.
              Also raises CalledProcessError if our ceph command fails
     """
@@ -586,35 +633,14 @@ def get_osd_tree(service):
                    .decode('UTF-8'))
         try:
             json_tree = json.loads(tree)
-            crush_list = []
-            # Make sure children are present in the json
-            if not json_tree['nodes']:
-                return None
-            host_nodes = [
-                node for node in json_tree['nodes']
-                if node['type'] == 'host'
-            ]
-            for host in host_nodes:
-                crush_list.append(
-                    CrushLocation(
-                        name=host.get('name'),
-                        identifier=host['id'],
-                        host=host.get('host'),
-                        rack=host.get('rack'),
-                        row=host.get('row'),
-                        datacenter=host.get('datacenter'),
-                        chassis=host.get('chassis'),
-                        root=host.get('root')
-                    )
-                )
-            return crush_list
+            roots = _flatten_roots(json_tree["nodes"])
+            return [CrushLocation(**host) for host in roots]
         except ValueError as v:
             log("Unable to parse ceph tree json: {}. Error: {}".format(
                 tree, v))
             raise
     except subprocess.CalledProcessError as e:
-        log("ceph osd tree command failed with message: {}".format(
-            e))
+        log("ceph osd tree command failed with message: {}".format(e))
         raise
 
 
