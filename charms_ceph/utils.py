@@ -3275,7 +3275,7 @@ def determine_packages_to_remove():
     """
     rm_packages = REMOVE_PACKAGES.copy()
     if is_container():
-        install_list = filter_missing_packages(CHRONY_PACKAGE)
+        install_list = filter_missing_packages([CHRONY_PACKAGE])
         if not install_list:
             rm_packages.append(CHRONY_PACKAGE)
     return rm_packages
