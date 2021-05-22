@@ -3271,13 +3271,14 @@ def determine_packages():
 def determine_packages_to_remove():
     """Determines packages for removal
 
+    Note: if in a container, then the CHRONY_PACKAGE is removed.
+
     :returns: list of packages to be removed
+    :rtype: List[str]
     """
     rm_packages = REMOVE_PACKAGES.copy()
     if is_container():
-        install_list = filter_missing_packages([CHRONY_PACKAGE])
-        if not install_list:
-            rm_packages.append(CHRONY_PACKAGE)
+        rm_packages.extend(filter_missing_packages([CHRONY_PACKAGE]))
     return rm_packages
 
 

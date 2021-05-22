@@ -870,6 +870,48 @@ class CephTestCase(unittest.TestCase):
     def test_create_keyrings_nautilus(self):
         self._test_create_keyrings(ceph_version='14.0.0')
 
+    @patch.object(utils, 'filter_missing_packages')
+    @patch.object(utils, 'is_container')
+    def test_determine_packages_to_remove_chrony(
+            self,
+            mock_is_container,
+            mock_filter_missing_packages):
+
+        packages_present = ["some", "random", "packages", utils.CHRONY_PACKAGE]
+        packages_missing = ["some", "random", "packages"]
+        chrony_is_present = True
+
+        def _filter_missing_packages(query_installed_pkgs):
+            pkgs = packages_present if chrony_is_present else packages_missing
+            return [p for p in query_installed_pkgs if p in pkgs]
+
+        mock_filter_missing_packages.side_effect = _filter_missing_packages
+
+        # Scenarios to check:
+        # 1. Not in a container.
+        # 2. In a container and chrony is installed.
+        # 3. In a container and chrony is not installed
+
+        # verify that an array is passed: bug: #1929054
+        # 1. first not in a container
+        mock_is_container.return_value = False
+        packages = utils.determine_packages_to_remove()
+        self.assertNotIn(utils.CHRONY_PACKAGE, packages)
+        mock_is_container.assert_called_once()
+        mock_filter_missing_packages.assert_not_called()
+
+        # 2. now in a container and chrony is installed
+        mock_is_container.return_value = True
+        packages = utils.determine_packages_to_remove()
+        self.assertIn(utils.CHRONY_PACKAGE, packages)
+        mock_filter_missing_packages.assert_called_once_with(
+            [utils.CHRONY_PACKAGE])
+
+        # 3. in a container and chrony is not installed
+        chrony_is_present = False
+        packages = utils.determine_packages_to_remove()
+        self.assertNotIn(utils.CHRONY_PACKAGE, packages)
+
     @patch.object(utils, 'chownr')
     @patch.object(utils, 'cmp_pkgrevno')
     @patch.object(utils, 'ceph_user')
