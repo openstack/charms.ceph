@@ -2074,3 +2074,63 @@ class CephGetLVSTestCase(unittest.TestCase):
             result = utils.is_pristine_disk('/dev/vdz')
         fake_open.assert_called_with('/dev/vdz', 'rb')
         self.assertEqual(result, False)
+
+
+class CephManagerAndConfig(unittest.TestCase):
+
+    MODULE_OUT = b"""
+{
+    "enabled_modules": [
+        "dashboard",
+        "iostat",
+        "restful"
+    ]}"""
+
+    @patch.object(utils.subprocess, 'check_output')
+    def test_enabled_manager_modules(self, _check_output):
+        _check_output.return_value = self.MODULE_OUT
+        self.assertEqual(
+            utils.enabled_manager_modules(),
+            ['dashboard', 'iostat', 'restful'])
+
+    @patch.object(utils, 'enabled_manager_modules')
+    def test_is_mgr_module_enabled(self, _enabled_manager_modules):
+        _enabled_manager_modules.return_value = ['dashboard', 'restful']
+        self.assertTrue(
+            utils.is_mgr_module_enabled('dashboard'))
+        self.assertFalse(
+            utils.is_mgr_module_enabled('ostrich'))
+
+    @patch.object(utils, 'is_mgr_module_enabled')
+    @patch.object(utils.subprocess, 'check_call')
+    def test_mgr_enable_module(self, _check_call, _is_mgr_module_enabled):
+        _is_mgr_module_enabled.return_value = True
+        utils.mgr_enable_module('dashboard')
+        self.assertFalse(_check_call.called)
+        _is_mgr_module_enabled.return_value = False
+        utils.mgr_enable_module('dashboard')
+        _check_call.assert_called_once_with(
+            ['ceph', 'mgr', 'module', 'enable', 'dashboard'])
+
+    @patch.object(utils, 'is_mgr_module_enabled')
+    @patch.object(utils.subprocess, 'check_call')
+    def test_mgr_disable_module(self, _check_call, _is_mgr_module_enabled):
+        _is_mgr_module_enabled.return_value = False
+        utils.mgr_disable_module('dashboard')
+        self.assertFalse(_check_call.called)
+        _is_mgr_module_enabled.return_value = True
+        utils.mgr_disable_module('dashboard')
+        _check_call.assert_called_once_with(
+            ['ceph', 'mgr', 'module', 'disable', 'dashboard'])
+
+    @patch.object(utils.subprocess, 'check_call')
+    def test_ceph_config_set(self, _check_call):
+        utils.ceph_config_set('mgr/dashboard/ssl', 'true', 'mgr')
+        _check_call.assert_called_once_with(
+            ['ceph', 'config', 'set', 'mgr', 'mgr/dashboard/ssl', 'true'])
+
+    @patch.object(utils.subprocess, 'check_output')
+    def test_ceph_config_get(self, _check_output):
+        utils.ceph_config_get('mgr/dashboard/ssl', 'mgr')
+        _check_output.assert_called_once_with(
+            ['ceph', 'config', 'get', 'mgr', 'mgr/dashboard/ssl'])
