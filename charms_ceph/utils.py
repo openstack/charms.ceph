@@ -696,7 +696,9 @@ def get_local_osd_ids():
             dirs = os.listdir(osd_path)
             for osd_dir in dirs:
                 osd_id = osd_dir.split('-')[1]
-                if _is_int(osd_id):
+                if (_is_int(osd_id) and
+                        filesystem_mounted(os.path.join(
+                            os.sep, osd_path, osd_dir))):
                     osd_ids.append(osd_id)
         except OSError:
             raise

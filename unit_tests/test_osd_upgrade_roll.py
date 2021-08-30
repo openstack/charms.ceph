@@ -466,6 +466,18 @@ class UpgradeRollingTestCase(unittest.TestCase):
         check_call.assert_called_with(['chown', '-R', 'ceph:ceph',
                                        '/var/lib/ceph'])
 
+    @patch('os.path.exists')
+    @patch('os.listdir')
+    @patch.object(charms_ceph.utils, 'filesystem_mounted')
+    def test_unmounted_osds(self, fs_mounted, listdir, exists):
+        exists.return_value = True
+        listdir.return_value = [
+            '/var/lib/ceph/osd/ceph-1', '/var/lib/ceph/osd/ceph-2']
+        fs_mounted.side_effect = lambda x: x == listdir.return_value[0]
+        osds = charms_ceph.utils.get_local_osd_ids()
+        self.assertIn(listdir.return_value[0][-1], osds)
+        self.assertNotIn(listdir.return_value[1][-1], osds)
+
 
 """
     @patch.object(charms_ceph.utils, 'log')
