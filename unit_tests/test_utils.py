@@ -127,7 +127,41 @@ class CephTestCase(unittest.TestCase):
         _is_active_bluestore_device.return_value = False
         utils.osdize('/dev/sdb', osd_format='xfs', osd_journal=None,
                      bluestore=False)
-        _ceph_volume.assert_called_with('/dev/sdb', None, False, False, 'ceph')
+        _ceph_volume.assert_called_with('/dev/sdb', None, False, False,
+                                        'ceph', None)
+        _check_call.assert_called_with(['ceph-volume', 'prepare'])
+        db.get.assert_called_with('osd-devices', [])
+        db.set.assert_called_with('osd-devices', ['/dev/sdb'])
+        db.flush.assert_called_once()
+
+    @patch.object(utils, 'kv')
+    @patch.object(utils.subprocess, 'check_call')
+    @patch.object(utils, '_ceph_volume')
+    @patch.object(utils, 'is_mapped_luks_device')
+    @patch.object(utils, 'is_active_bluestore_device')
+    @patch.object(utils.os.path, 'exists')
+    @patch.object(utils, 'is_device_mounted')
+    @patch.object(utils, 'cmp_pkgrevno')
+    @patch.object(utils, 'is_block_device')
+    def test_osdize_dev_ceph_volume_with_osdid(self, _is_blk, _cmp, _mounted,
+                                               _exists, _is_mapped_luks_device,
+                                               _is_active_bluestore_device,
+                                               _ceph_volume, _check_call, _kv):
+        """Test that _ceph_volume is called with an OSD id."""
+        db = MagicMock()
+        _kv.return_value = db
+        db.get.return_value = []
+        _is_blk.return_value = True
+        _mounted.return_value = False
+        _exists.return_value = True
+        _cmp.return_value = 1
+        _ceph_volume.return_value = ['ceph-volume', 'prepare']
+        _is_mapped_luks_device.return_value = False
+        _is_active_bluestore_device.return_value = False
+        utils.osdize('/dev/sdb', osd_format='xfs', osd_journal=None,
+                     bluestore=False, osd_id=123)
+        _ceph_volume.assert_called_with('/dev/sdb', None, False, False,
+                                        'ceph', 123)
         _check_call.assert_called_with(['ceph-volume', 'prepare'])
         db.get.assert_called_with('osd-devices', [])
         db.set.assert_called_with('osd-devices', ['/dev/sdb'])
