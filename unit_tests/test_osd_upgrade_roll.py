@@ -1,4 +1,4 @@
-# Copyright 2016 Canonical Ltd
+# Copyright 2016-2021 Canonical Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -93,11 +93,11 @@ class UpgradeRollingTestCase(unittest.TestCase):
         charms_ceph.utils.upgrade_osd('hammer')
         service_restart.assert_called_with('ceph-osd-all')
         status_set.assert_has_calls([
-            call('maintenance', 'Upgrading osd'),
+            call('maintenance', 'Upgrading OSD'),
         ])
         log.assert_has_calls(
             [
-                call('Current ceph version is 0.8'),
+                call('Current Ceph version is 0.8'),
                 call('Upgrading to: hammer')
             ]
         )
@@ -150,12 +150,12 @@ class UpgradeRollingTestCase(unittest.TestCase):
             call('2', 'ceph-2'),
         ])
         status_set.assert_has_calls([
-            call('maintenance', 'Upgrading osd'),
+            call('maintenance', 'Upgrading OSD'),
             call('maintenance', 'Upgrading packages to jewel')
         ])
         log.assert_has_calls(
             [
-                call('Current ceph version is 0.94'),
+                call('Current Ceph version is 0.94'),
                 call('Upgrading to: jewel')
             ]
         )
@@ -200,12 +200,12 @@ class UpgradeRollingTestCase(unittest.TestCase):
         update_owner.assert_not_called()
         _upgrade_single_osd.assert_not_called()
         status_set.assert_has_calls([
-            call('maintenance', 'Upgrading osd'),
+            call('maintenance', 'Upgrading OSD'),
             call('maintenance', 'Upgrading packages to luminous')
         ])
         log.assert_has_calls(
             [
-                call('Current ceph version is 10.2'),
+                call('Current Ceph version is 10.2'),
                 call('Upgrading to: luminous')
             ]
         )

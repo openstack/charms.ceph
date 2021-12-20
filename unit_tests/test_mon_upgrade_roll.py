@@ -1,4 +1,4 @@
-# Copyright 2016 Canonical Ltd
+# Copyright 2016-2021 Canonical Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -128,7 +128,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
 
         log.assert_has_calls(
             [
-                call('Current ceph version is 0.8'),
+                call('Current Ceph version is 0.8'),
                 call('Upgrading to: hammer')
             ]
         )
@@ -180,7 +180,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
 
         log.assert_has_calls(
             [
-                call('Current ceph version is 0.94'),
+                call('Current Ceph version is 0.94'),
                 call('Upgrading to: jewel')
             ]
         )
@@ -239,7 +239,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
 
         log.assert_has_calls(
             [
-                call('Current ceph version is 10.2'),
+                call('Current Ceph version is 10.2'),
                 call('Upgrading to: luminous')
             ]
         )
