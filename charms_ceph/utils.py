@@ -2186,6 +2186,20 @@ def roll_monitor_cluster(new_version, upgrade_key):
             wait_for_all_monitors_to_upgrade(new_version=new_version,
                                              upgrade_key=upgrade_key)
             bootstrap_manager()
+
+        # NOTE(jmcvaughn):
+        # Nautilus and later binaries use msgr2 by default, but existing
+        # clusters that have been upgraded from pre-Nautilus will not
+        # automatically have msgr2 enabled. Without this, Ceph will show
+        # a warning only (with no impact to operations), but newly added units
+        # will not be able to join the cluster. Therefore, we ensure it is
+        # enabled on upgrade for all versions including and after Nautilus
+        # (to cater for previous charm versions that will not have done this).
+        nautilus_or_later = cmp_pkgrevno('ceph-common', '14.0.0') >= 0
+        if nautilus_or_later:
+            wait_for_all_monitors_to_upgrade(new_version=new_version,
+                                             upgrade_key=upgrade_key)
+            enable_msgr2()
     except ValueError:
         log("Failed to find {} in list {}.".format(
             my_name, mon_sorted_list))
@@ -3330,6 +3344,16 @@ def bootstrap_manager():
         unit = 'ceph-mgr@{}'.format(hostname)
         subprocess.check_call(['systemctl', 'enable', unit])
         service_restart(unit)
+
+
+def enable_msgr2():
+    """
+    Enables msgr2
+
+    :raises: subprocess.CalledProcessError if the command fails
+    """
+    cmd = ['ceph', 'mon', 'enable-msgr2']
+    subprocess.check_call(cmd)
 
 
 def osd_noout(enable):

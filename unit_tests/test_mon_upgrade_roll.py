@@ -299,12 +299,13 @@ class UpgradeRollingTestCase(unittest.TestCase):
                                          service='mon',
                                          upgrade_key='admin',
                                          version=new_version)
-        if new_version == 'luminous':
+        if new_version in ['luminous', 'mimic']:
             wait_for_all_monitors_to_upgrade.assert_called_with(
                 new_version=new_version,
                 upgrade_key='admin',
             )
-            bootstrap_manager.assert_called_once_with()
+            if new_version == 'luminous':
+                bootstrap_manager.assert_called_once_with()
         else:
             wait_for_all_monitors_to_upgrade.assert_not_called()
             bootstrap_manager.assert_not_called()
@@ -312,12 +313,23 @@ class UpgradeRollingTestCase(unittest.TestCase):
         upgrade_monitor.assert_has_calls([
             call(new_version, restart_daemons=False)])
 
-    def test_roll_monitor_cluster_luminous(self):
-        self._test_roll_monitor_cluster(new_version='luminous')
+    @patch.object(charms_ceph.utils, 'cmp_pkgrevno', lambda _x, _y: 1)
+    @patch.object(charms_ceph.utils, 'enable_msgr2')
+    def test_roll_monitor_cluster_mimic(self, mock_enable_msgr2):
+        self._test_roll_monitor_cluster(new_version='mimic')
+        mock_enable_msgr2.assert_called_once()
 
+    @patch.object(charms_ceph.utils, 'cmp_pkgrevno', lambda _x, _y: 1)
+    @patch.object(charms_ceph.utils, 'enable_msgr2')
+    def test_roll_monitor_cluster_luminous(self, mock_enable_msgr2):
+        self._test_roll_monitor_cluster(new_version='luminous')
+        mock_enable_msgr2.assert_called_once()
+
+    @patch.object(charms_ceph.utils, 'cmp_pkgrevno', lambda _x, _y: -1)
     def test_roll_monitor_cluster_jewel(self):
         self._test_roll_monitor_cluster(new_version='jewel')
 
+    @patch.object(charms_ceph.utils, 'cmp_pkgrevno', lambda _x, _y: -1)
     def test_roll_monitor_cluster_hammer(self):
         self._test_roll_monitor_cluster(new_version='hammer')
 
