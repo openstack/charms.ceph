@@ -228,7 +228,7 @@ class UpgradeRollingTestCase(unittest.TestCase):
         socket.gethostname.return_value = 'testmon'
         ceph_user.return_value = 'ceph'
         systemd.return_value = True
-        mock_cmp_pkgrevno.return_value = 0   # it is luminous
+        mock_cmp_pkgrevno.side_effect = [0, -1]   # it is luminous
 
         charms_ceph.utils.upgrade_monitor('luminous')
         service_stop.assert_any_call('ceph-mon')
@@ -241,6 +241,60 @@ class UpgradeRollingTestCase(unittest.TestCase):
             [
                 call('Current Ceph version is 10.2'),
                 call('Upgrading to: luminous')
+            ]
+        )
+        status_set.assert_has_calls([
+            call('maintenance', 'Upgrading monitor'),
+        ])
+        chownr.assert_not_called()
+        mkdir.assert_called_with('/var/lib/ceph/mon/ceph-testmon',
+                                 owner='ceph',
+                                 group='ceph',
+                                 perms=0o755)
+
+    @patch.object(charms_ceph.utils, 'cmp_pkgrevno')
+    @patch.object(charms_ceph.utils, 'determine_packages')
+    @patch.object(charms_ceph.utils, 'ceph_user')
+    @patch.object(charms_ceph.utils, 'socket')
+    @patch.object(charms_ceph.utils, 'mkdir')
+    @patch.object(charms_ceph.utils, 'apt_install')
+    @patch.object(charms_ceph.utils, 'chownr')
+    @patch.object(charms_ceph.utils, 'service_stop')
+    @patch.object(charms_ceph.utils, 'service_start')
+    @patch.object(charms_ceph.utils, 'service_restart')
+    @patch.object(charms_ceph.utils, 'log')
+    @patch.object(charms_ceph.utils, 'status_set')
+    @patch.object(charms_ceph.utils, 'apt_update')
+    @patch.object(charms_ceph.utils, 'add_source')
+    @patch.object(charms_ceph.utils, 'systemd')
+    @patch.object(charms_ceph.utils, 'get_version')
+    @patch.object(charms_ceph.utils, 'config')
+    def test_upgrade_monitor_octopus(self, config, get_version,
+                                     systemd, add_source,
+                                     apt_update, status_set, log,
+                                     service_restart,
+                                     service_start, service_stop, chownr,
+                                     apt_install, mkdir, socket,
+                                     ceph_user, _determine_packages,
+                                     mock_cmp_pkgrevno):
+        get_version.side_effect = [14.2, 15.2]
+        config.side_effect = config_side_effect
+        socket.gethostname.return_value = 'testmon'
+        ceph_user.return_value = 'ceph'
+        systemd.return_value = True
+        mock_cmp_pkgrevno.side_effect = [1, 1]   # it is pacific
+
+        charms_ceph.utils.upgrade_monitor('octopus')
+        service_stop.assert_any_call('ceph-mon@testmon')
+        service_stop.assert_any_call('ceph-mgr.target')
+        service_restart.assert_any_call('ceph-mon@testmon')
+        service_restart.assert_any_call('ceph-mgr.target')
+        add_source.assert_called_with('cloud:trusty-kilo', 'key')
+
+        log.assert_has_calls(
+            [
+                call('Current Ceph version is 14.2'),
+                call('Upgrading to: octopus')
             ]
         )
         status_set.assert_has_calls([

@@ -2231,7 +2231,8 @@ def upgrade_monitor(new_version, kick_function=None, restart_daemons=True):
 
     # Needed to determine if whether to stop/start ceph-mgr
     luminous_or_later = cmp_pkgrevno('ceph-common', '12.2.0') >= 0
-
+    # Needed to differentiate between systemd unit names
+    nautilus_or_later = cmp_pkgrevno('ceph-common', '14.0.0') >= 0
     kick_function()
     try:
         add_source(config('source'), config('key'))
@@ -2260,7 +2261,11 @@ def upgrade_monitor(new_version, kick_function=None, restart_daemons=True):
 
     try:
         if systemd():
-            service_stop('ceph-mon')
+            if nautilus_or_later:
+                systemd_unit = 'ceph-mon@{}'.format(socket.gethostname())
+            else:
+                systemd_unit = 'ceph-mon'
+            service_stop(systemd_unit)
             log("restarting ceph-mgr.target maybe: {}"
                 .format(luminous_or_later))
             if luminous_or_later:
@@ -2291,7 +2296,11 @@ def upgrade_monitor(new_version, kick_function=None, restart_daemons=True):
               perms=0o755)
 
         if systemd():
-            service_restart('ceph-mon')
+            if nautilus_or_later:
+                systemd_unit = 'ceph-mon@{}'.format(socket.gethostname())
+            else:
+                systemd_unit = 'ceph-mon'
+            service_restart(systemd_unit)
             log("starting ceph-mgr.target maybe: {}".format(luminous_or_later))
             if luminous_or_later:
                 # due to BUG: #1849874 we have to force a restart to get it to
