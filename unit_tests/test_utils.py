@@ -2167,8 +2167,29 @@ class CephManagerAndConfig(unittest.TestCase):
         "restful"
     ]}"""
 
+    @patch.object(utils, 'cmp_pkgrevno')
     @patch.object(utils.subprocess, 'check_output')
-    def test_enabled_manager_modules(self, _check_output):
+    def test_enabled_manager_modules_pre_quincy(
+            self, _check_output, _cmp_pkgrevno):
+        _check_output.return_value = self.MODULE_OUT
+        _cmp_pkgrevno.return_value = -1
+        utils.enabled_manager_modules()
+        _check_output.assert_called_once_with(['ceph', 'mgr', 'module', 'ls'])
+
+    @patch.object(utils, 'cmp_pkgrevno')
+    @patch.object(utils.subprocess, 'check_output')
+    def test_enabled_manager_modules_quincy(
+            self, _check_output, _cmp_pkgrevno):
+        _check_output.return_value = self.MODULE_OUT
+        _cmp_pkgrevno.return_value = 0
+        utils.enabled_manager_modules()
+        _check_output.assert_called_once_with(
+            ['ceph', 'mgr', 'module', 'ls', '--format=json'])
+
+    @patch.object(utils, 'cmp_pkgrevno')
+    @patch.object(utils.subprocess, 'check_output')
+    def test_enabled_manager_modules(self, _check_output, _cmp_pkgrevno):
+        _cmp_pkgrevno.return_value = -1
         _check_output.return_value = self.MODULE_OUT
         self.assertEqual(
             utils.enabled_manager_modules(),
