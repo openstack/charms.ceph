@@ -1061,7 +1061,9 @@ class CephTestCase(unittest.TestCase):
         _get_named_key.assert_called_once_with(
             name='someid',
             caps=collections.OrderedDict([
-                ('mon', ['profile rbd; allow r']),
+                ('mon', ['allow profile rbd-mirror-peer',
+                         'allow command "service dump"',
+                         'allow command "service status"']),
                 ('osd', ['profile rbd']),
                 ('mgr', ['allow r']),
             ])
