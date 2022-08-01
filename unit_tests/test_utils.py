@@ -2058,7 +2058,7 @@ class CephUseBluestoreTestCase(unittest.TestCase):
                                                     _cmp_pkgrevno):
         _cmp_pkgrevno.return_value = 1
         _config.return_value = True
-        assert(utils.use_bluestore())
+        assert (utils.use_bluestore())
 
     @patch.object(utils, 'cmp_pkgrevno')
     @patch.object(utils, 'config')
