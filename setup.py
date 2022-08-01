@@ -6,7 +6,11 @@ from setuptools import setup, find_packages
 from setuptools.command.test import test as TestCommand
 
 version = "0.0.1.dev1"
+
+# This must be kept in sync with requirements.txt
 install_require = [
+    'charmhelpers',
+    'pyudev',
 ]
 
 tests_require = [
