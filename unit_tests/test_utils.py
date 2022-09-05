@@ -1241,6 +1241,16 @@ class CephApplyOSDSettingsTestCase(unittest.TestCase):
         self.grace = 'osd_heartbeat_grace'
         self.interval = 'osd_heartbeat_interval'
 
+    @patch.object(utils.subprocess, 'check_output')
+    @patch.object(utils.os.path, 'exists')
+    @patch.object(utils.os, 'listdir')
+    @patch.object(utils, 'filesystem_mounted')
+    def test_osd_ids_with_crimson(self, fs_mounted, listdir,
+                                  path_exists, check_output):
+        check_output.return_value = b'38271 /usr/bin/crimson-osd -i 5\n'
+        listdir.return_value = ['ceph-3', 'ceph-5']
+        self.assertEqual(['3'], utils.get_local_osd_ids())
+
     @patch.object(utils, 'get_local_osd_ids')
     @patch.object(utils.subprocess, 'check_output')
     def test_apply_osd_settings(self, _check_output, _get_local_osd_ids):

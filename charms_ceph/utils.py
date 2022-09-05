@@ -681,15 +681,29 @@ def _get_osd_num_from_dirname(dirname):
     return match.group('osd_id')
 
 
+def get_crimson_osd_ids():
+    """Return a set of the OSDs that are running with the Crimson backend."""
+    rv = set()
+    try:
+        out = subprocess.check_output(['pgrep', 'crimson-osd', '-a'])
+        for line in out.decode('utf8').splitlines():
+            rv.add(line.split()[-1])
+    except Exception:
+        pass
+
+    return rv
+
+
 def get_local_osd_ids():
     """This will list the /var/lib/ceph/osd/* directories and try
     to split the ID off of the directory name and return it in
-    a list.
+    a list. Excludes crimson OSD's from the returned list.
 
     :returns: list. A list of OSD identifiers
     :raises: OSError if something goes wrong with listing the directory.
     """
     osd_ids = []
+    crimson_osds = get_crimson_osd_ids()
     osd_path = os.path.join(os.sep, 'var', 'lib', 'ceph', 'osd')
     if os.path.exists(osd_path):
         try:
@@ -698,7 +712,8 @@ def get_local_osd_ids():
                 osd_id = osd_dir.split('-')[1]
                 if (_is_int(osd_id) and
                         filesystem_mounted(os.path.join(
-                            os.sep, osd_path, osd_dir))):
+                            os.sep, osd_path, osd_dir)) and
+                        osd_id not in crimson_osds):
                     osd_ids.append(osd_id)
         except OSError:
             raise
@@ -2067,7 +2082,7 @@ def filesystem_mounted(fs):
 
 def get_running_osds():
     """Returns a list of the pids of the current running OSD daemons"""
-    cmd = ['pgrep', 'ceph-osd']
+    cmd = ['pgrep', 'ceph-osd|crimson-osd']
     try:
         result = str(subprocess.check_output(cmd).decode('UTF-8'))
         return result.split()
