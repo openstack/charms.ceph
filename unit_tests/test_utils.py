@@ -570,6 +570,17 @@ class CephTestCase(unittest.TestCase):
                   'mon', ('allow r; allow command "osd blacklist"'
                           '; allow command "osd blocklist"'),
                   'osd', 'allow rwx'])])
+        mock_check_output.reset_mock()
+        mock_check_output.side_effect = [b'key=test']
+        utils.get_named_key(name="rgw001")
+        mock_check_output.assert_called_once_with([
+            'sudo', '-u', 'ceph', 'ceph', '--name',
+            'mon.', '--keyring',
+            '/var/lib/ceph/mon/ceph-osd001/keyring',
+            'auth', 'get', 'client.rgw001'])
+        mock_check_output.reset_mock()
+        utils.get_named_key(name="rgw001")
+        mock_check_output.assert_not_called()
 
     def test_parse_key_with_caps_existing_key(self):
         expected = "AQCm7aVYQFXXFhAAj0WIeqcag88DKOvY4UKR/g=="

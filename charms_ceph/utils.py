@@ -1217,26 +1217,11 @@ def get_named_key(name, caps=None, pool_list=None):
     :returns: Returns a cephx key
     """
     key_name = 'client.{}'.format(name)
-    try:
-        # Does the key already exist?
-        output = str(subprocess.check_output(
-            [
-                'sudo',
-                '-u', ceph_user(),
-                'ceph',
-                '--name', 'mon.',
-                '--keyring',
-                '/var/lib/ceph/mon/ceph-{}/keyring'.format(
-                    socket.gethostname()
-                ),
-                'auth',
-                'get',
-                key_name,
-            ]).decode('UTF-8')).strip()
-        return parse_key(output)
-    except subprocess.CalledProcessError:
-        # Couldn't get the key, time to create it!
-        log("Creating new key for {}".format(name), level=DEBUG)
+    key = ceph_auth_get(key_name)
+    if key:
+        return key
+
+    log("Creating new key for {}".format(name), level=DEBUG)
     caps = caps or _default_caps
     cmd = [
         "sudo",
@@ -1259,12 +1244,37 @@ def get_named_key(name, caps=None, pool_list=None):
                 pools = " ".join(['pool={0}'.format(i) for i in pool_list])
                 subcaps[0] = subcaps[0] + " " + pools
         cmd.extend([subsystem, '; '.join(subcaps)])
+    ceph_auth_get.cache_clear()
 
     log("Calling check_output: {}".format(cmd), level=DEBUG)
     return parse_key(str(subprocess
                          .check_output(cmd)
                          .decode('UTF-8'))
                      .strip())  # IGNORE:E1103
+
+
+@functools.lru_cache()
+def ceph_auth_get(key_name):
+    try:
+        # Does the key already exist?
+        output = str(subprocess.check_output(
+            [
+                'sudo',
+                '-u', ceph_user(),
+                'ceph',
+                '--name', 'mon.',
+                '--keyring',
+                '/var/lib/ceph/mon/ceph-{}/keyring'.format(
+                    socket.gethostname()
+                ),
+                'auth',
+                'get',
+                key_name,
+            ]).decode('UTF-8')).strip()
+        return parse_key(output)
+    except subprocess.CalledProcessError:
+        # Couldn't get the key
+        pass
 
 
 def upgrade_key_caps(key, caps, pool_list=None):
