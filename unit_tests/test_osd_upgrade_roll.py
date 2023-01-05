@@ -478,6 +478,21 @@ class UpgradeRollingTestCase(unittest.TestCase):
         self.assertIn(listdir.return_value[0][-1], osds)
         self.assertNotIn(listdir.return_value[1][-1], osds)
 
+    @patch('os.path.exists')
+    @patch('os.listdir')
+    @patch.object(charms_ceph.utils, 'filesystem_mounted')
+    def test_get_osd_ids_unexpected_files(self, fs_mounted, listdir, exists):
+        exists.return_value = True
+        listdir.return_value = [
+            '/var/lib/ceph/osd/ceph-1',
+            '/var/lib/ceph/osd/ceph-2',
+            '/var/lib/ceph/osd/ohno!'
+        ]
+        fs_mounted.side_effect = lambda x: x == listdir.return_value[0]
+        osds = charms_ceph.utils.get_local_osd_ids()
+        self.assertIn(listdir.return_value[0][-1], osds)
+        self.assertNotIn(listdir.return_value[1][-1], osds)
+
 
 """
     @patch.object(charms_ceph.utils, 'log')
