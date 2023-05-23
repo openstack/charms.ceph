@@ -5,7 +5,7 @@ coverage>=3.6
 nose
 flake8>=2.2.4
 stestr
-requests==2.6.0
+requests==2.31.0
 netifaces
 mock
 git+https://github.com/openstack/charms.openstack.git#egg=charms.openstack
