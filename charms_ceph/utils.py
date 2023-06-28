@@ -1231,13 +1231,15 @@ def get_named_key(name, caps=None, pool_list=None):
     :param caps: dict of cephx capabilities
     :returns: Returns a cephx key
     """
+    caps = caps or _default_caps
     key_name = 'client.{}'.format(name)
+
     key = ceph_auth_get(key_name)
     if key:
+        upgrade_key_caps(key_name, caps)
         return key
 
     log("Creating new key for {}".format(name), level=DEBUG)
-    caps = caps or _default_caps
     cmd = [
         "sudo",
         "-u",
