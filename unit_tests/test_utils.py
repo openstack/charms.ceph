@@ -538,6 +538,7 @@ class CephTestCase(unittest.TestCase):
     @patch.object(utils.socket, "gethostname", lambda: "osd001")
     def test_get_named_key_with_pool(self, mock_check_output):
         mock_check_output.side_effect = [CalledProcessError(0, 0, 0), b""]
+        utils.ceph_auth_get.cache_clear()
         utils.get_named_key(name="rgw001", pool_list=["rbd", "block"])
         mock_check_output.assert_has_calls([
             call(['sudo', '-u', 'ceph', 'ceph', '--name',
