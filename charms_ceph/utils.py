@@ -3248,6 +3248,7 @@ UCA_CODENAME_MAP = {
     'yoga': 'quincy',
     'zed': 'quincy',
     'antelope': 'quincy',
+    'bobcat': 'quincy',
 }
 
 
