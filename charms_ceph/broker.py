@@ -106,6 +106,8 @@ def decode_req_encode_rsp(f):
     """Decorator to decode incoming requests and encode responses."""
 
     def decode_inner(req):
+        if isinstance(req, bytes):
+            req = req.decode('utf-8')
         return json.dumps(f(json.loads(req)))
 
     return decode_inner
