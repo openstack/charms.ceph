@@ -2075,6 +2075,7 @@ def get_cephfs(service):
             for part in parts:
                 if "name" in part:
                     filesystems.append(part.split(' ')[1])
+        return filesystems
     except subprocess.CalledProcessError:
         return []
 

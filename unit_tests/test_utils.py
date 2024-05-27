@@ -1228,6 +1228,25 @@ class CephTestCase(unittest.TestCase):
                        },
              })
 
+    @patch.object(utils.subprocess, 'check_output')
+    @patch.object(utils, 'get_version')
+    def test_get_cephfs(self, _get_version, _check_output):
+        _get_version.side_effect = [0.80, 0.90, 0.90]
+        self.assertEqual(utils.get_cephfs('admin'), [])
+
+        _check_output.return_value = (
+            b"name: filesystem, metadata pool: filesystem_metadata, "
+            b"data pools: [filesystem_data ]\n"
+            b"name: ip-172-31, metadata pool: ip-172-31_metadata, "
+            b"data pools: [ip-172-31_data ]\n"
+        )
+        self.assertEqual(
+            utils.get_cephfs('admin'), [
+                'filesystem', 'ip-172-31'])
+
+        _check_output.return_value = b""
+        self.assertEqual(utils.get_cephfs('admin'), [])
+
 
 class CephApplyOSDSettingsTestCase(unittest.TestCase):
 

@@ -865,10 +865,9 @@ class CephBrokerTestCase(unittest.TestCase):
         )
         mock_create_erasure_profile.assert_not_called()
 
-    @patch.object(charms_ceph.broker, 'get_cephfs')
     @patch.object(charms_ceph.broker, 'check_output')
     @patch.object(charms_ceph.broker, 'log')
-    def test_create_cephfs_client(self, mock_log, check_output, get_cephfs):
+    def test_create_cephfs_client(self, mock_log, check_output):
         def mock_check_output(*args, **kwargs):
             cmd = args[0]
             if cmd[:5] == ["ceph", "--id", "admin", "auth", "ls"]:
@@ -930,7 +929,6 @@ class CephBrokerTestCase(unittest.TestCase):
                 """)
             return unittest.mock.DEFAULT
 
-        get_cephfs.return_value = ["filesystem"]
         check_output.side_effect = mock_check_output
         reqs = json.dumps({'api-version': 1,
                            'request-id': '1ef5aede',
@@ -942,7 +940,20 @@ class CephBrokerTestCase(unittest.TestCase):
                                'perms': 'rw',
                            }]})
         rc = json.loads(charms_ceph.broker.process_requests(reqs))
-        get_cephfs.assert_called_once_with(service='admin')
         self.assertEqual(rc['exit-code'], 0)
         self.assertEqual(rc['request-id'], '1ef5aede')
         self.assertEqual(rc['key'], 'fs-client-key')
+
+        reqs = json.dumps({'api-version': 1,
+                           'request-id': 'aabbccdd',
+                           'ops': [{
+                               'op': 'create-cephfs-client',
+                               'fs_name': 'filesystem',
+                               'client_id': 'other-client',
+                               'path': '/',
+                               'perms': 'rw',
+                           }]})
+        rc = json.loads(charms_ceph.broker.process_requests(reqs))
+        self.assertEqual(rc['exit-code'], 0)
+        self.assertEqual(rc['request-id'], 'aabbccdd')
+        self.assertEqual(rc['key'], 'other-client-key')
