@@ -121,7 +121,7 @@ class CephTestCase(unittest.TestCase):
         _is_mapped_luks_device.return_value = False
         utils.osdize('/dev/sdb', osd_format='xfs', osd_journal=None)
         _ceph_volume.assert_called_with('/dev/sdb', None, False,
-                                        'ceph', None)
+                                        'ceph', None, None)
         _check_call.assert_called_with(['ceph-volume', 'prepare'])
         db.get.assert_called_with('osd-devices', [])
         db.set.assert_called_with('osd-devices', ['/dev/sdb'])
@@ -151,7 +151,37 @@ class CephTestCase(unittest.TestCase):
         utils.osdize('/dev/sdb', osd_format='xfs', osd_journal=None,
                      osd_id=123)
         _ceph_volume.assert_called_with('/dev/sdb', None, False,
-                                        'ceph', 123)
+                                        'ceph', 123, None)
+        _check_call.assert_called_with(['ceph-volume', 'prepare'])
+        db.get.assert_called_with('osd-devices', [])
+        db.set.assert_called_with('osd-devices', ['/dev/sdb'])
+        db.flush.assert_called_once()
+
+    @patch.object(utils, 'kv')
+    @patch.object(utils.subprocess, 'check_call')
+    @patch.object(utils, '_ceph_volume')
+    @patch.object(utils, 'is_mapped_luks_device')
+    @patch.object(utils.os.path, 'exists')
+    @patch.object(utils, 'is_device_mounted')
+    @patch.object(utils, 'cmp_pkgrevno')
+    @patch.object(utils, 'is_block_device')
+    def test_osdize_dev_ceph_volume_with_skip(self, _is_blk, _cmp, _mounted,
+                                              _exists, _is_mapped_luks_device,
+                                              _ceph_volume, _check_call, _kv):
+        """Test that _ceph_volume is called with the bluestore skip params."""
+        db = MagicMock()
+        _kv.return_value = db
+        db.get.return_value = []
+        _is_blk.return_value = True
+        _mounted.return_value = False
+        _exists.return_value = True
+        _cmp.return_value = 1
+        _ceph_volume.return_value = ['ceph-volume', 'prepare']
+        _is_mapped_luks_device.return_value = False
+        utils.osdize('/dev/sdb', osd_format='xfs', osd_journal=None,
+                     osd_id=123, bluestore_skip=('wal', 'db'))
+        _ceph_volume.assert_called_with('/dev/sdb', None, False,
+                                        'ceph', 123, ('wal', 'db'))
         _check_call.assert_called_with(['ceph-volume', 'prepare'])
         db.get.assert_called_with('osd-devices', [])
         db.set.assert_called_with('osd-devices', ['/dev/sdb'])
@@ -1816,6 +1846,63 @@ class CephVolumeTestCase(unittest.TestCase):
         _calculate_volume_size.assert_has_calls([
             call('wal'),
             call('db'),
+        ])
+
+    @patch.object(utils.uuid, 'uuid4')
+    @patch.object(utils, 'calculate_volume_size')
+    @patch.object(utils, 'find_least_used_utility_device')
+    @patch.object(utils, 'get_devices')
+    @patch.object(utils, '_allocate_logical_volume')
+    def test_ceph_volume_bluestore_skip_db(self, _allocate_logical_volume,
+                                           _get_devices,
+                                           _find_least_used_utility_device,
+                                           _calculate_volume_size, _uuid4):
+        _bluestore_devs = {
+            'bluestore-db': ['/dev/sdc'],
+            'bluestore-wal': ['/dev/sdd'],
+        }
+        _get_devices.side_effect = lambda x: _bluestore_devs.get(x, [])
+        _find_least_used_utility_device.side_effect = \
+            lambda x, lvs=False: x[0]
+        _calculate_volume_size.return_value = 1024
+        _uuid4.return_value = self._osd_uuid
+        _allocate_logical_volume.side_effect = (
+            lambda *args, **kwargs: (
+                'ceph-{osd_fsid}/osd-{lv_type}-{osd_fsid}'.format(**kwargs)
+            )
+        )
+        self.assertEqual(
+            utils._ceph_volume('/dev/sdb',
+                               osd_journal=None,
+                               encrypt=False,
+                               bluestore_skip=('db',)),
+            ['ceph-volume',
+             'lvm',
+             'create',
+             '--osd-fsid',
+             self._osd_uuid,
+             '--bluestore',
+             '--data',
+             ('ceph-{fsid}/'
+              'osd-block-{fsid}').format(fsid=self._osd_uuid),
+             '--block.wal',
+             ('ceph-{fsid}/'
+              'osd-wal-{fsid}').format(fsid=self._osd_uuid)]
+        )
+        _allocate_logical_volume.assert_has_calls([
+            call(dev='/dev/sdb', lv_type='block',
+                 osd_fsid=self._osd_uuid,
+                 encrypt=False, key_manager='ceph'),
+            call(dev='/dev/sdd', lv_type='wal',
+                 osd_fsid=self._osd_uuid,
+                 shared=True, size='1024M',
+                 encrypt=False, key_manager='ceph'),
+        ])
+        _find_least_used_utility_device.assert_has_calls([
+            call(['/dev/sdd'], lvs=True),
+        ])
+        _calculate_volume_size.assert_has_calls([
+            call('wal'),
         ])
 
 
