@@ -1528,11 +1528,12 @@ def get_devices(name):
 
 
 def osdize(dev, osd_format, osd_journal, ignore_errors=False, encrypt=False,
-           bluestore=False, key_manager=CEPH_KEY_MANAGER, osd_id=None):
+           bluestore=False, key_manager=CEPH_KEY_MANAGER, osd_id=None,
+           bluestore_skip=None):
     if dev.startswith('/dev'):
         osdize_dev(dev, osd_format, osd_journal,
                    ignore_errors, encrypt,
-                   bluestore, key_manager, osd_id)
+                   bluestore, key_manager, osd_id, bluestore_skip)
     else:
         if cmp_pkgrevno('ceph', '14.0.0') >= 0:
             log("Directory backed OSDs can not be created on Nautilus",
@@ -1543,7 +1544,7 @@ def osdize(dev, osd_format, osd_journal, ignore_errors=False, encrypt=False,
 
 def osdize_dev(dev, osd_format, osd_journal, ignore_errors=False,
                encrypt=False, bluestore=False, key_manager=CEPH_KEY_MANAGER,
-               osd_id=None):
+               osd_id=None, bluestore_skip=None):
     """
     Prepare a block device for use as a Ceph OSD
 
@@ -1558,6 +1559,8 @@ def osdize_dev(dev, osd_format, osd_journal, ignore_errors=False,
     :param: encrypt: Encrypt block devices using 'key_manager'
     :param: bluestore: Use bluestore native Ceph block device format
     :param: key_manager: Key management approach for encryption keys
+    :param: osd_id: The ID for the newly created OSD
+    :param: bluestore_skip: Bluestore parameters to skip ('wal' and/or 'db')
     :raises subprocess.CalledProcessError: in the event that any supporting
                                            subprocess operation failed
     :raises ValueError: if an invalid key_manager is provided
@@ -1609,7 +1612,8 @@ def osdize_dev(dev, osd_format, osd_journal, ignore_errors=False,
                                encrypt,
                                bluestore,
                                key_manager,
-                               osd_id)
+                               osd_id,
+                               bluestore_skip)
         else:
             cmd = _ceph_disk(dev,
                              osd_format,
@@ -1693,7 +1697,8 @@ def _ceph_disk(dev, osd_format, osd_journal, encrypt=False, bluestore=False):
 
 
 def _ceph_volume(dev, osd_journal, encrypt=False, bluestore=False,
-                 key_manager=CEPH_KEY_MANAGER, osd_id=None):
+                 key_manager=CEPH_KEY_MANAGER, osd_id=None,
+                 bluestore_skip=None):
     """
     Prepare and activate a device for usage as a Ceph OSD using ceph-volume.
 
@@ -1706,6 +1711,7 @@ def _ceph_volume(dev, osd_journal, encrypt=False, bluestore=False,
     :param: bluestore: Use bluestore storage for OSD
     :param: key_manager: dm-crypt Key Manager to use
     :param: osd_id: The OSD-id to recycle, or None to create a new one
+    :param: bluestore_skip: Bluestore parameters to skip ('wal' and/or 'db')
     :raises subprocess.CalledProcessError: in the event that any supporting
                                            LVM operation failed.
     :returns: list. 'ceph-volume' command and required parameters for
@@ -1751,7 +1757,11 @@ def _ceph_volume(dev, osd_journal, encrypt=False, bluestore=False,
                                         key_manager=key_manager))
 
     if bluestore:
-        for extra_volume in ('wal', 'db'):
+        extras = ('wal', 'db')
+        if bluestore_skip:
+            extras = tuple(set(extras) - set(bluestore_skip))
+
+        for extra_volume in extras:
             devices = get_devices('bluestore-{}'.format(extra_volume))
             if devices:
                 cmd.append('--block.{}'.format(extra_volume))
